@@ -1,0 +1,166 @@
+name: paperless
+
+services:
+
+  # ── Traefik – Reverse Proxy with automatic Let's Encrypt TLS ──────────────
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--log.level=INFO"
+      # HTTP entrypoint – redirects all traffic to HTTPS
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # HTTPS entrypoint
+      - "--entrypoints.websecure.address=:443"
+      # Docker provider – discovers services via Docker labels
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # Let's Encrypt ACME certificate resolver (HTTP-01 challenge)
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in .env}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Read-only access to the Docker socket so Traefik can discover services
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Persistent storage for ACME certificates (must have chmod 600)
+      - ./traefik/acme.json:/acme.json
+    networks:
+      - proxy
+
+  # ── Redis – Message broker for Paperless-ngx task queue ──────────────────
+  broker:
+    image: docker.io/library/redis:7
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    networks:
+      - paperless-internal
+
+  # ── PostgreSQL – Database for Paperless-ngx ───────────────────────────────
+  db:
+    image: docker.io/library/postgres:16
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${PAPERLESS_DBNAME:-paperless}
+      POSTGRES_USER: ${PAPERLESS_DBUSER:-paperless}
+      POSTGRES_PASSWORD: ${PAPERLESS_DBPASS:?Set PAPERLESS_DBPASS in .env}
+    networks:
+      - paperless-internal
+
+  # ── Gotenberg – Document-to-PDF conversion service ────────────────────────
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:8.20
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=file:///tmp/.*"
+    networks:
+      - paperless-internal
+
+  # ── Apache Tika – Content extraction (enables full-text search for many
+  #    file formats such as DOCX, XLSX, ODT, …) ─────────────────────────────
+  tika:
+    image: docker.io/apache/tika:3.1.0
+    restart: unless-stopped
+    networks:
+      - paperless-internal
+
+  # ── Paperless-ngx – Document Management System ───────────────────────────
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    volumes:
+      - paperless-data:/usr/src/paperless/data
+      - paperless-media:/usr/src/paperless/media
+      - paperless-export:/usr/src/paperless/export
+      - paperless-consume:/usr/src/paperless/consume
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBNAME: ${PAPERLESS_DBNAME:-paperless}
+      PAPERLESS_DBUSER: ${PAPERLESS_DBUSER:-paperless}
+      PAPERLESS_DBPASS: ${PAPERLESS_DBPASS:?Set PAPERLESS_DBPASS in .env}
+      # Enable Tika + Gotenberg for extended file-format support
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      # Application settings
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?Set PAPERLESS_SECRET_KEY in .env}
+      PAPERLESS_URL: https://${PAPERLESS_DOMAIN:?Set PAPERLESS_DOMAIN in .env}
+      PAPERLESS_TIME_ZONE: ${TZ:-Europe/Berlin}
+      USERMAP_UID: ${USERMAP_UID:-1000}
+      USERMAP_GID: ${USERMAP_GID:-1000}
+    networks:
+      - paperless-internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.paperless.rule=Host(`${PAPERLESS_DOMAIN}`)"
+      - "traefik.http.routers.paperless.entrypoints=websecure"
+      - "traefik.http.routers.paperless.tls.certresolver=letsencrypt"
+      - "traefik.http.services.paperless.loadbalancer.server.port=8000"
+      # Tell Traefik to reach this container via the shared proxy network
+      - "traefik.docker.network=paperless-proxy"
+
+  # ── rclone – Google Drive synchronisation ────────────────────────────────
+  # Periodically mirrors the Paperless media and export directories to a
+  # Google Drive folder. See rclone/rclone.conf.example for how to configure.
+  rclone-sync:
+    image: rclone/rclone:latest
+    restart: unless-stopped
+    depends_on:
+      - paperless
+    volumes:
+      # Mount document volumes read-only – rclone only reads, never writes
+      - paperless-media:/data/media:ro
+      - paperless-export:/data/export:ro
+      # rclone configuration (copy rclone.conf.example → rclone.conf and fill
+      # in your credentials before first start)
+      - ./rclone/rclone.conf:/config/rclone/rclone.conf:ro
+      # Sync script
+      - ./rclone/sync.sh:/sync.sh:ro
+    environment:
+      # Name of the rclone remote defined in rclone.conf (default: gdrive)
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
+      # Destination path inside Google Drive
+      RCLONE_DEST_PATH: ${RCLONE_DEST_PATH:-paperless-backup}
+      # How often to sync, in seconds (default: every hour)
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-3600}
+    entrypoint: /bin/sh
+    command: ["/sync.sh"]
+    # rclone-sync only needs outbound internet access; no internal network needed
+    networks: []
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  # Shared network between Traefik and services that need to be reachable from
+  # the internet. Uses an explicit name so the Traefik label can reference it.
+  proxy:
+    name: paperless-proxy
+  # Isolated backend network – Paperless-ngx dependencies are NOT exposed
+  paperless-internal:
+    internal: true
+
+# ── Named Volumes ─────────────────────────────────────────────────────────────
+volumes:
+  paperless-data:
+  paperless-media:
+  paperless-export:
+  paperless-consume:
+  pgdata:
+  redisdata:
