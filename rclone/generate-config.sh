@@ -18,6 +18,8 @@
 # Option B – Service Account (Google Workspace / automated):
 #   RCLONE_SERVICE_ACCOUNT_FILE – path inside the container to the JSON key file
 #                                  (when set, Option A variables are ignored)
+#   RCLONE_TEAM_DRIVE           – Shared Drive ID (required for service accounts;
+#                                  service accounts have no personal storage quota)
 
 set -e
 
@@ -38,6 +40,16 @@ type = ${TYPE}
 scope = ${SCOPE}
 service_account_file = ${RCLONE_SERVICE_ACCOUNT_FILE}
 EOF
+    # Service accounts have no personal storage quota; a Shared Drive ID is
+    # required to avoid storageQuotaExceeded (403) errors.
+    if [ -n "${RCLONE_TEAM_DRIVE:-}" ]; then
+        echo "team_drive = ${RCLONE_TEAM_DRIVE}" >> "${CONFIG_FILE}"
+    else
+        echo "WARNING: RCLONE_TEAM_DRIVE is not set. Service accounts cannot" >&2
+        echo "  write to personal 'My Drive' – syncs will fail with a" >&2
+        echo "  storageQuotaExceeded (403) error. Set RCLONE_TEAM_DRIVE to" >&2
+        echo "  the ID of a Shared Drive the service account has access to." >&2
+    fi
 else
     # ── Option A – OAuth ──────────────────────────────────────────────────────
     if [ -z "${RCLONE_TOKEN:-}" ]; then

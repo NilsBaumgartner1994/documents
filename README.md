@@ -86,18 +86,29 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 
 #### Option B – Service account (Google Workspace / automated setups)
 
+> **⚠️ Storage-quota limitation:** Google service accounts do **not** have
+> their own Google Drive storage quota.  Syncing to a regular "My Drive" folder
+> will fail with a `storageQuotaExceeded` (403) error.  You must target a
+> **Shared Drive** (formerly "Team Drive") that the service account has been
+> granted access to.  See steps 2 and 5 below.
+
 1. Create a service account in [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts).
-2. Grant it "Editor" access to the target Google Drive folder.
-3. Download the JSON key and place it on the **host** at `rclone/service-account.json`
+2. Create (or use an existing) **Shared Drive** in Google Drive and add the
+   service account as a **Content Manager** or **Manager** of that Shared Drive.
+3. Find the **Shared Drive ID**: open the Shared Drive in Google Drive – the ID
+   is the long alphanumeric string in the URL after `/drive/folders/`.
+4. Download the JSON key and place it on the **host** at `rclone/service-account.json`
    (i.e. next to `docker-compose.yml`).
    The bind-mount is already defined in `docker-compose.yml` and is automatically
    picked up when the file exists (requires Docker Compose ≥ v2.20).
-4. In `.env`, uncomment and set `RCLONE_SERVICE_ACCOUNT_FILE` to the
-   **in-container** path:
+5. In `.env`, uncomment and set the following variables:
    ```dotenv
    RCLONE_SERVICE_ACCOUNT_FILE=/config/rclone/service-account.json
+
+   # Required when using a service account – paste the Shared Drive ID here:
+   RCLONE_TEAM_DRIVE=<your-shared-drive-id>
    ```
-5. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
+6. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
 
 ### 5 – Start the stack
 
