@@ -23,12 +23,11 @@
 #   8. Copy the "token" value from ~/.config/rclone/rclone.conf into
 #      RCLONE_TOKEN in your .env file.
 #
-# Generated result:
+# Generated result (client_id and client_secret are omitted when left empty,
+# so rclone uses its built-in OAuth app credentials):
 #
 # [gdrive]
 # type = drive
-# client_id =
-# client_secret =
 # scope = drive
 # token = {"access_token":"…","token_type":"Bearer","refresh_token":"…","expiry":"…"}
 #
