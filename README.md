@@ -90,21 +90,14 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 2. Grant it "Editor" access to the target Google Drive folder.
 3. Download the JSON key and place it on the **host** at `rclone/service-account.json`
    (i.e. next to `docker-compose.yml`).
-4. Add a bind-mount for the key file to the `rclone-config` service in
-   `docker-compose.yml`:
-   ```yaml
-   rclone-config:
-     volumes:
-       - rclone-config:/config/rclone
-       - ./rclone/generate-config.sh:/generate-config.sh:ro
-       - ./rclone/service-account.json:/config/rclone/service-account.json:ro   # ← add this
-   ```
-5. In `.env`, uncomment and set `RCLONE_SERVICE_ACCOUNT_FILE` to the
-   **in-container** path (this is different from the host path above):
+   The bind-mount is already defined in `docker-compose.yml` and is automatically
+   picked up when the file exists (requires Docker Compose ≥ v2.20).
+4. In `.env`, uncomment and set `RCLONE_SERVICE_ACCOUNT_FILE` to the
+   **in-container** path:
    ```dotenv
    RCLONE_SERVICE_ACCOUNT_FILE=/config/rclone/service-account.json
    ```
-6. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
+5. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
 
 ### 5 – Start the stack
 
