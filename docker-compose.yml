@@ -136,7 +136,7 @@ services:
     volumes:
       - paperless-ai-data:/app/data
     environment:
-      PAPERLESS_API_URL: http://paperless:8000/api
+      PAPERLESS_API_URL: http://paperless:8000
       PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
       # Use Google Gemini via the OpenAI-compatible endpoint
       AI_PROVIDER: custom
