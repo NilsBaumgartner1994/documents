@@ -45,14 +45,21 @@ else
         exit 1
     fi
     echo "Generating rclone.conf (OAuth mode) ..."
+    # Write the base config
     cat > "${CONFIG_FILE}" <<EOF
 [${REMOTE}]
 type = ${TYPE}
-client_id = ${RCLONE_CLIENT_ID:-}
-client_secret = ${RCLONE_CLIENT_SECRET:-}
 scope = ${SCOPE}
 token = ${RCLONE_TOKEN}
 EOF
+    # Only add client_id / client_secret when explicitly provided; leaving them
+    # out lets rclone fall back to its built-in OAuth app credentials.
+    if [ -n "${RCLONE_CLIENT_ID:-}" ]; then
+        echo "client_id = ${RCLONE_CLIENT_ID}" >> "${CONFIG_FILE}"
+    fi
+    if [ -n "${RCLONE_CLIENT_SECRET:-}" ]; then
+        echo "client_secret = ${RCLONE_CLIENT_SECRET}" >> "${CONFIG_FILE}"
+    fi
 fi
 
 echo "rclone.conf written to ${CONFIG_FILE}"
