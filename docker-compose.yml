@@ -157,12 +157,14 @@ services:
   # Provides a web-based chat UI that connects to Ollama.
   # Includes built-in RAG (Retrieval Augmented Generation) support so you
   # can upload documents and ask questions about their content.
+  # Starts as soon as Ollama is ready; ollama-init pulls the model in the
+  # background so the UI is available immediately at http://ai.localhost.
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     restart: unless-stopped
     depends_on:
-      ollama-init:
-        condition: service_completed_successfully
+      ollama:
+        condition: service_started
     volumes:
       - open-webui-data:/app/backend/data
     environment:
