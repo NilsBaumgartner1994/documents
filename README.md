@@ -39,9 +39,13 @@ Open `.env` and fill in **all required values**:
 
 ```dotenv
 ACME_EMAIL=your-email@example.com       # Let's Encrypt notifications
-PAPERLESS_DOMAIN=paperless.example.com  # Your public domain
-PAPERLESS_SECRET_KEY=<random 64-char string>
-PAPERLESS_DBPASS=<strong password>
+DOMAIN=paperless.example.com            # Your public domain
+SECRET=<random 64-char string>          # Django secret key
+RCLONE_TOKEN=<token JSON from rclone>   # Google Drive OAuth token
+
+PAPERLESS_ADMIN_USER=admin              # Admin username
+PAPERLESS_ADMIN_MAIL=admin@example.com  # Admin e-mail
+PAPERLESS_ADMIN_PASSWORD=<password>     # Admin password
 ```
 
 Generate a secure secret key:
@@ -66,13 +70,11 @@ chmod 600 traefik/acme.json
 > You can disable the `rclone-sync` service by commenting it out in
 > `docker-compose.yml`.
 
-#### Option A – OAuth (personal Google account, recommended)
-
-First, **install rclone on your local machine** (not the server):
+**Install rclone on your local machine** (not the server):
 [https://rclone.org/install/](https://rclone.org/install/)
 
-Then run `rclone config` and follow the interactive wizard to create a remote
-named `gdrive` with `drive` scope.  Copy the resulting token to the server:
+Run `rclone config` and follow the interactive wizard to create a remote
+named `gdrive` with `drive` scope.  Then copy the token to your `.env`:
 
 ```bash
 # On your local machine:
@@ -80,24 +82,9 @@ rclone config   # create remote named "gdrive", type "drive"
 # After completing the OAuth flow, copy the token value:
 cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdrive]
 
-# On the server – paste the token value into .env:
+# On the server – paste the token JSON value into .env:
 # RCLONE_TOKEN={"access_token":"…","refresh_token":"…",…}
 ```
-
-#### Option B – Service account (Google Workspace / automated setups)
-
-1. Create a service account in [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts).
-2. Grant it "Editor" access to the target Google Drive folder.
-3. Download the JSON key and place it on the **host** at `rclone/service-account.json`
-   (i.e. next to `docker-compose.yml`).
-   The bind-mount is already defined in `docker-compose.yml` and is automatically
-   picked up when the file exists (requires Docker Compose ≥ v2.20).
-4. In `.env`, uncomment and set `RCLONE_SERVICE_ACCOUNT_FILE` to the
-   **in-container** path:
-   ```dotenv
-   RCLONE_SERVICE_ACCOUNT_FILE=/config/rclone/service-account.json
-   ```
-5. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
 
 ### 5 – Start the stack
 
@@ -105,16 +92,16 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 docker compose up -d
 ```
 
-Traefik will automatically obtain a TLS certificate for `PAPERLESS_DOMAIN` on
+Traefik will automatically obtain a TLS certificate for `DOMAIN` on
 first start (requires DNS to be configured and ports 80/443 to be reachable).
 
 ### 6 – Create the Paperless-ngx admin user
 
-```bash
-docker compose exec paperless python3 manage.py createsuperuser
-```
+The admin account is created (or updated) automatically on startup using the
+`PAPERLESS_ADMIN_USER`, `PAPERLESS_ADMIN_MAIL`, and `PAPERLESS_ADMIN_PASSWORD`
+values from `.env`.
 
-Open `https://<PAPERLESS_DOMAIN>` in your browser and log in.
+Open `https://<DOMAIN>` in your browser and log in.
 
 ---
 
@@ -172,9 +159,9 @@ HTTP.
 ### 1 – Set the required `.env` values
 
 ```dotenv
-PAPERLESS_DOMAIN=localhost          # used only as a label; Traefik is disabled
+DOMAIN=localhost          # used only as a label; Traefik is disabled
 ACME_EMAIL=local@localhost          # any value is fine – ACME is not used
-PAPERLESS_SECRET_KEY=<random string>
+SECRET=<random string>
 PAPERLESS_DBPASS=<password>
 ```
 
@@ -186,10 +173,9 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 
 ### 3 – Create the admin user
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml \
-  exec paperless python3 manage.py createsuperuser
-```
+The admin account is created automatically on startup from the
+`PAPERLESS_ADMIN_USER`, `PAPERLESS_ADMIN_MAIL`, and `PAPERLESS_ADMIN_PASSWORD`
+values in `.env`.
 
 Open **http://localhost:8000** in your browser and log in.
 
