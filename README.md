@@ -152,6 +152,43 @@ docker compose logs -f rclone-sync
 
 ---
 
+## Running locally (no public domain)
+
+If you just want to try the stack on your own machine without a public domain
+or TLS certificate, use the provided `docker-compose.local.yml` override.  It
+disables Traefik and exposes Paperless-ngx directly on port **8000** via plain
+HTTP.
+
+### 1 – Set the required `.env` values
+
+```dotenv
+PAPERLESS_DOMAIN=localhost          # used only as a label; Traefik is disabled
+ACME_EMAIL=local@localhost          # any value is fine – ACME is not used
+PAPERLESS_SECRET_KEY=<random string>
+PAPERLESS_DBPASS=<password>
+```
+
+### 2 – Start the stack with the local override
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+```
+
+### 3 – Create the admin user
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml \
+  exec paperless python3 manage.py createsuperuser
+```
+
+Open **http://localhost:8000** in your browser and log in.
+
+> **Note:** The rclone Google Drive sync is included in the local stack as well.
+> If you don't need it, comment out the `rclone-config` and `rclone-sync`
+> services in `docker-compose.yml`.
+
+---
+
 ## Useful commands
 
 ```bash
