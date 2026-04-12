@@ -66,38 +66,31 @@ chmod 600 traefik/acme.json
 > You can disable the `rclone-sync` service by commenting it out in
 > `docker-compose.yml`.
 
-#### Option A – OAuth (personal Google account, recommended)
+#### Configure rclone for Google Drive
 
-First, **install rclone on your local machine** (not the server):
-[https://rclone.org/install/](https://rclone.org/install/)
+1. Create an OAuth client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+   - Application type: **Desktop app**
+   - Add the Google Drive API to your project
+   - Download the client ID and secret
 
-Then run `rclone config` and follow the interactive wizard to create a remote
-named `gdrive` with `drive` scope.  Copy the resulting token to the server:
-
-```bash
-# On your local machine:
-rclone config   # create remote named "gdrive", type "drive"
-# After completing the OAuth flow, copy the token value:
-cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdrive]
-
-# On the server – paste the token value into .env:
-# RCLONE_TOKEN={"access_token":"…","refresh_token":"…",…}
-```
-
-#### Option B – Service account (Google Workspace / automated setups)
-
-1. Create a service account in [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts).
-2. Grant it "Editor" access to the target Google Drive folder.
-3. Download the JSON key and place it on the **host** at `rclone/service-account.json`
-   (i.e. next to `docker-compose.yml`).
-   The bind-mount is already defined in `docker-compose.yml` and is automatically
-   picked up when the file exists (requires Docker Compose ≥ v2.20).
-4. In `.env`, uncomment and set `RCLONE_SERVICE_ACCOUNT_FILE` to the
-   **in-container** path:
+2. Set them in `.env`:
    ```dotenv
-   RCLONE_SERVICE_ACCOUNT_FILE=/config/rclone/service-account.json
+   RCLONE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   RCLONE_CLIENT_SECRET=your-client-secret
    ```
-5. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
+
+3. Run the one-time authorization (opens a browser for OAuth):
+   ```bash
+   docker compose run --rm rclone-auth
+   ```
+   The token is saved automatically to a Docker volume – nothing gets added to `.env`.
+
+   > **Remote server?** Forward port 53682 with an SSH tunnel first so the
+   > OAuth callback can reach the container:
+   > ```bash
+   > ssh -L 53682:localhost:53682 your-server
+   > ```
+   > Then run `docker compose run --rm rclone-auth` in the server session.
 
 ### 5 – Start the stack
 

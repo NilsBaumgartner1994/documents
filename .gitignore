@@ -2,7 +2,6 @@
 # Never commit real credentials or private keys
 .env
 rclone/rclone.conf
-rclone/service-account.json
 
 # ── Traefik ACME certificate store ────────────────────────────────────────
 # Contains TLS private keys – must NOT be committed
