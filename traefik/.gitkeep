@@ -1,4 +1,0 @@
-# This file keeps the traefik/ directory in version control.
-# The actual acme.json (TLS certificate store) is created with:
-#   touch traefik/acme.json && chmod 600 traefik/acme.json
-# It is listed in .gitignore because it contains TLS private keys.

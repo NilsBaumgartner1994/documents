@@ -12,7 +12,7 @@ A ready-to-run Docker Compose stack that combines:
 | **[Ollama](https://ollama.com/)** | Local LLM inference server (runs gemma4:e4b) |
 | **[Open WebUI](https://openwebui.com/)** | ChatGPT-like interface for the local AI |
 | **[rclone](https://rclone.org/)** | Periodic sync of documents to **Google Drive** |
-| **[Traefik v3](https://traefik.io/traefik/)** | Reverse proxy with automatic **Let's Encrypt** TLS |
+| **[Traefik v3](https://traefik.io/traefik/)** | Reverse proxy with TLS (self-signed locally, optional Let's Encrypt for production) |
 
 ---
 
@@ -51,7 +51,7 @@ PAPERLESS_DOMAIN=paperless.example.com
 PAPERLESS_URL=https://paperless.example.com
 OPEN_WEBUI_DOMAIN=ai.paperless.example.com
 OPEN_WEBUI_AUTH=true
-ACME_EMAIL=your-email@example.com          # required for Let's Encrypt
+ACME_EMAIL=your-email@example.com          # required for Let's Encrypt (see README)
 ```
 
 Generate a secure secret key:
@@ -60,17 +60,7 @@ Generate a secure secret key:
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### 3 – Create the Traefik certificate store
-
-Traefik stores TLS private keys in `traefik/acme.json`.
-The file **must** be owned by the process user and have permissions `600`:
-
-```bash
-touch traefik/acme.json
-chmod 600 traefik/acme.json
-```
-
-### 4 – Configure rclone for Google Drive
+### 3 – Configure rclone for Google Drive
 
 > **Skip this step if you don't need Google Drive sync.**
 > You can disable the `rclone-sync` service by commenting it out in
@@ -109,23 +99,25 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
    ```
 5. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
 
-### 5 – Start the stack
+### 4 – Start the stack
 
 ```bash
 docker compose up -d
 ```
 
-Traefik routes traffic by hostname:
+Traefik routes traffic by hostname (both HTTP and HTTPS):
 
 | URL | Service |
 |---|---|
-| `http://localhost` | Paperless-ngx |
-| `http://ai.localhost` | Open WebUI (AI chat) |
+| `http://localhost` / `https://localhost` | Paperless-ngx |
+| `http://ai.localhost` / `https://ai.localhost` | Open WebUI (AI chat) |
 
-For production, Traefik will additionally obtain a TLS certificate for your
-domain via Let's Encrypt (requires DNS + ports 80/443 to be reachable).
+> **Note:** For localhost the HTTPS certificate is self-signed. Your browser may
+> show a security warning – accept it to continue. For production with a real
+> domain you can configure automatic Let's Encrypt certificates (see
+> [Traefik details](#traefik-details) below).
 
-### 6 – Create the Paperless-ngx admin user
+### 5 – Create the Paperless-ngx admin user
 
 ```bash
 docker compose exec paperless python3 manage.py createsuperuser
@@ -143,8 +135,6 @@ your browser and log in.
 ├── docker-compose.yml          # Main stack definition
 ├── .env.example                # Template for environment variables
 ├── .gitignore
-├── traefik/
-│   └── acme.json               # TLS certificates (auto-generated, git-ignored)
 ├── ollama/
 │   └── pull-model.sh           # Init script: auto-pulls the configured model
 └── rclone/
@@ -290,10 +280,21 @@ docker compose logs -f open-webui
 ## Traefik details
 
 - Traefik listens on port **80** (HTTP) and **443** (HTTPS).
-- For **localhost** use, everything works over plain HTTP – no certificates needed.
-- For **production**, TLS certificates are issued by **Let's Encrypt** via the
-  HTTP-01 challenge (requires `ACME_EMAIL` to be set to a real e-mail address).
-- Certificates are stored in `traefik/acme.json` (git-ignored).
+- For **localhost** use, HTTPS is served with Traefik's built-in **self-signed
+  certificate**. Your browser will show a certificate warning, but the
+  connection is encrypted.
+- For **production** with automatic **Let's Encrypt** TLS, add the following to
+  `docker-compose.yml` under the `traefik` service `command`:
+  ```yaml
+  - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+  - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+  - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+  - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+  ```
+  Mount the certificate store: `- ./traefik/acme.json:/acme.json` (create it
+  with `touch traefik/acme.json && chmod 600 traefik/acme.json`).
+  Then add the label `traefik.http.routers.<name>-secure.tls.certresolver=letsencrypt`
+  to each service that needs a real certificate.
 - The Traefik dashboard is **disabled** by default. To enable it, add
   `--api.dashboard=true` to the `traefik` command in `docker-compose.yml`
   and secure it with a middleware.
@@ -302,9 +303,8 @@ docker compose logs -f open-webui
 
 ## Security notes
 
-- `traefik/acme.json` contains TLS private keys – never commit it.
 - `rclone/rclone.conf` contains OAuth tokens – never commit it.
 - `.env` contains passwords and secret keys – never commit it.
-- All three files are listed in `.gitignore`.
+- Both files are listed in `.gitignore`.
 - The internal backend network (`paperless-internal`) is isolated from the
   internet; only Traefik can reach Paperless-ngx via the `proxy` network.

@@ -3,9 +3,9 @@ name: paperless
 services:
 
   # ── Traefik – Reverse Proxy ──────────────────────────────────────────────
-  # Works out of the box for localhost (plain HTTP on port 80).
-  # For production with a real domain, set ACME_EMAIL in .env to enable
-  # automatic Let's Encrypt TLS on port 443.
+  # Works out of the box for localhost with HTTPS (self-signed certificate).
+  # For production with a real domain and automatic Let's Encrypt TLS see
+  # the README section "Traefik details".
   traefik:
     image: traefik:v3.3
     container_name: traefik
@@ -19,21 +19,12 @@ services:
       # Docker provider – discovers services via Docker labels
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      # Let's Encrypt ACME certificate resolver (HTTP-01 challenge)
-      # Uses a dummy default so the stack starts without ACME_EMAIL for
-      # local use; real certificates require a valid e-mail address.
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-noreply@localhost}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
     ports:
       - "80:80"
       - "443:443"
     volumes:
       # Read-only access to the Docker socket so Traefik can discover services
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Persistent storage for ACME certificates (must have chmod 600)
-      - ./traefik/acme.json:/acme.json
     networks:
       - proxy
 
@@ -116,10 +107,10 @@ services:
       # HTTP router (localhost / plain HTTP)
       - "traefik.http.routers.paperless.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`)"
       - "traefik.http.routers.paperless.entrypoints=web"
-      # HTTPS router (production with TLS)
+      # HTTPS router (self-signed by default; set CERT_RESOLVER for Let's Encrypt)
       - "traefik.http.routers.paperless-secure.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`)"
       - "traefik.http.routers.paperless-secure.entrypoints=websecure"
-      - "traefik.http.routers.paperless-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.paperless-secure.tls=true"
       - "traefik.http.services.paperless.loadbalancer.server.port=8000"
       # Tell Traefik to reach this container via the shared proxy network
       - "traefik.docker.network=paperless-proxy"
@@ -185,10 +176,10 @@ services:
       # HTTP router (localhost / plain HTTP)
       - "traefik.http.routers.open-webui.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.localhost}`)"
       - "traefik.http.routers.open-webui.entrypoints=web"
-      # HTTPS router (production with TLS)
+      # HTTPS router (self-signed by default; set CERT_RESOLVER for Let's Encrypt)
       - "traefik.http.routers.open-webui-secure.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.localhost}`)"
       - "traefik.http.routers.open-webui-secure.entrypoints=websecure"
-      - "traefik.http.routers.open-webui-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.open-webui-secure.tls=true"
       - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
       - "traefik.docker.network=paperless-proxy"
 
