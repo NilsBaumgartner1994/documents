@@ -138,12 +138,26 @@ your browser and log in.
 Paperless-AI erkennt neue Dokumente automatisch und vergibt Titel, Tags,
 Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
 
+> **⚠️ Wichtig: `PAPERLESS_SECRET_KEY` ≠ API Token!**
+>
+> `PAPERLESS_SECRET_KEY` ist Djangos interner Schlüssel für Sessions und
+> Hashing – er wird **nie** als API-Token verwendet. Der API-Token für
+> Paperless-AI wird separat in der Paperless-ngx Admin-Oberfläche erstellt
+> (siehe Schritt 1 unten).
+
 #### Schritt 1: Paperless-ngx API-Token erstellen
 
 1. Öffne Paperless-ngx im Browser (`http://localhost`).
-2. Gehe zu **Einstellungen → API** (oder im Django-Admin: `/admin/auth/token/`).
-3. Erstelle einen neuen Token und kopiere ihn.
-4. Trage den Token in die `.env`-Datei ein:
+2. Logge dich mit dem Admin-User ein (erstellt in Quick-start Schritt 5 oben).
+3. Öffne den **Django-Admin**-Bereich:
+   ```
+   http://localhost/admin/authtoken/tokenproxy/
+   ```
+4. Klicke auf **"Add token"** (oder "Token hinzufügen").
+5. Wähle deinen Admin-User aus dem Dropdown und klicke **"Save"**.
+6. Kopiere den generierten Token (eine lange Zeichenkette, z.B.
+   `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0`).
+7. Trage den Token in die `.env`-Datei ein:
    ```dotenv
    PAPERLESS_AI_TOKEN=dein-kopierter-token
    ```
@@ -166,7 +180,7 @@ Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
 docker compose up -d
 ```
 
-#### Schritt 4: Paperless-AI Web UI öffnen
+#### Schritt 4: Paperless-AI Setup-Wizard durchlaufen
 
 Öffne die Paperless-AI Oberfläche im Browser:
 
@@ -174,9 +188,63 @@ docker compose up -d
 http://localhost:3000
 ```
 
-Beim ersten Start wirst du durch einen **Einrichtungsassistenten** geführt.
-Dort kannst du die Verbindung zu Paperless-ngx und die AI-Einstellungen
-überprüfen und anpassen.
+Beim ersten Start wirst du durch einen **Einrichtungsassistenten** mit
+mehreren Tabs geführt. Hier eine Anleitung für jeden Tab:
+
+---
+
+##### Tab 1: User Setup
+
+| Feld | Was eingeben |
+|---|---|
+| **Admin Username** | Frei wählbar – das ist der Login-Name für die Paperless-AI Web-Oberfläche (z.B. `admin`). |
+| **Admin Password** | Frei wählbar – ein sicheres Passwort für die Paperless-AI Web-Oberfläche. |
+
+> **Hinweis:** Dieser Benutzer ist **nur für die Paperless-AI Web UI** – er hat
+> nichts mit dem Paperless-ngx Admin-User zu tun.
+
+---
+
+##### Tab 2: Connection
+
+Hier wird die Verbindung zu Paperless-ngx konfiguriert.
+
+| Feld | Was eingeben | Erklärung |
+|---|---|---|
+| **Paperless-ngx API URL** | `http://paperless:8000` | Der Docker-Service-Name aus `docker-compose.yml`. **Nicht** `localhost` verwenden – das funktioniert nicht zwischen Docker-Containern! **Ohne** `/api` am Ende eingeben – der Pfad wird automatisch angehängt. |
+| **API Token** | Den Token aus Schritt 1 einfügen | z.B. `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0` – das ist **nicht** der `PAPERLESS_SECRET_KEY`! |
+| **Paperless-ngx Username** | Dein Paperless-ngx Admin-Benutzername | Der Benutzername, den du in Schritt 5 (`createsuperuser`) erstellt hast. |
+
+> **⚠️ Häufiger Fehler:** `localhost` oder `127.0.0.1` funktioniert **nicht**
+> im Docker-Bridge-Netzwerk. Der Container-Name `paperless` wird über das
+> interne Docker-Netzwerk (`paperless-internal`) aufgelöst.
+
+---
+
+##### Tab 3: AI Settings
+
+| Feld | Was eingeben | Erklärung |
+|---|---|---|
+| **AI Provider** | `Custom / OpenAI compatible` auswählen | Wir nutzen die Gemini-API über den OpenAI-kompatiblen Endpunkt. |
+| **Custom Base URL** | `https://generativelanguage.googleapis.com/v1beta/openai/` | OpenAI-kompatibler Endpunkt für Google Gemini. |
+| **Custom API Key** | Dein Gemini API-Key aus Schritt 2 | Der Key von Google AI Studio. |
+| **Custom Model** | `gemini-2.0-flash` | Schnelles Modell im kostenlosen Tarif. Alternativ: `gemini-1.5-flash`, `gemini-1.5-pro`. |
+
+> **Tipp:** Falls die Felder vorausgefüllt sind (aus den Umgebungsvariablen
+> in `docker-compose.yml`), kontrolliere nur die Werte und klicke weiter.
+
+---
+
+##### Tab 4: Advanced
+
+Hier kannst du erweiterte Einstellungen vornehmen. Die Standardwerte sind
+für den Anfang in Ordnung. Klicke auf **"Save"** / **"Finish"**, um den
+Setup-Wizard abzuschließen.
+
+---
+
+Nach dem Abschluss des Wizards startet Paperless-AI automatisch und
+überwacht neue Dokumente in Paperless-ngx.
 
 ---
 
@@ -283,9 +351,16 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 
 | Variable | Beschreibung |
 |---|---|
-| `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (Einstellungen → API) |
+| `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (**nicht** `PAPERLESS_SECRET_KEY`!) – erstellt unter `/admin/authtoken/tokenproxy/` |
 | `GEMINI_API_KEY` | Google Gemini API-Key ([hier erstellen](https://aistudio.google.com/app/apikey)) |
 | `GEMINI_MODEL` | Modell (Standard: `gemini-2.0-flash`) |
+
+> **⚠️ `PAPERLESS_SECRET_KEY` vs. `PAPERLESS_AI_TOKEN`:**
+>
+> | Variable | Zweck |
+> |---|---|
+> | `PAPERLESS_SECRET_KEY` | Djangos interner Schlüssel für Sessions/Hashing – wird **nie** als API-Token genutzt |
+> | `PAPERLESS_AI_TOKEN` | Der API-Token, mit dem Paperless-AI auf die Paperless-ngx API zugreift |
 
 ### Nützliche Befehle
 
