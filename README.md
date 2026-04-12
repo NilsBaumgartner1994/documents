@@ -144,36 +144,24 @@ All four directories are listed in `.gitignore` – they are never committed.
 
 ## Google Drive sync details
 
-The `rclone-sync` service runs in the background and calls `rclone sync` on a
-configurable schedule (default: **every hour**).
+The `rclone-sync` service treats **Google Drive as the source of truth**:
 
-The following directories are mirrored **from your host to Google Drive**
-(one-way upload only – rclone never downloads files automatically):
+| Phase | Direction | When |
+|---|---|---|
+| **Initial restore** | Google Drive → local | Every time the container starts |
+| **Periodic backup** | local → Google Drive | Every `SYNC_INTERVAL_SECONDS` (default: 1 h) |
+
+On a **fresh host with empty local directories** rclone will automatically
+download all documents from Google Drive before Paperless-ngx starts indexing.
+If Google Drive is also empty, the restore is a no-op and Paperless starts
+with no documents — as expected on a brand-new installation.
+
+The following directories are kept in sync:
 
 | Local host path | Google Drive path |
 |---|---|
 | `./paperless/media` (originals + thumbnails) | `<RCLONE_DEST_PATH>/media` |
 | `./paperless/export` (manual exports) | `<RCLONE_DEST_PATH>/export` |
-
-> **Fresh start / empty local directories:** rclone will **not** automatically
-> download anything from Google Drive.  If you need to restore from a backup,
-> run the following restore command once before starting the stack:
->
-> ```bash
-> # Restore media from Google Drive backup
-> docker run --rm \
->   -v "$(pwd)/paperless/media:/data/media" \
->   -v "$(pwd)/rclone:/config/rclone:ro" \
->   rclone/rclone:latest \
->   copy gdrive:<RCLONE_DEST_PATH>/media /data/media --progress
->
-> # Restore export from Google Drive backup
-> docker run --rm \
->   -v "$(pwd)/paperless/export:/data/export" \
->   -v "$(pwd)/rclone:/config/rclone:ro" \
->   rclone/rclone:latest \
->   copy gdrive:<RCLONE_DEST_PATH>/export /data/export --progress
-> ```
 
 Relevant `.env` options:
 
@@ -181,7 +169,7 @@ Relevant `.env` options:
 |---|---|---|
 | `RCLONE_REMOTE` | `gdrive` | rclone remote name in `rclone.conf` |
 | `RCLONE_DEST_PATH` | `paperless-backup` | Folder path in Google Drive |
-| `SYNC_INTERVAL_SECONDS` | `3600` | Seconds between syncs |
+| `SYNC_INTERVAL_SECONDS` | `3600` | Seconds between upload syncs |
 
 View sync logs:
 
