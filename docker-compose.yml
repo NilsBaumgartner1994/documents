@@ -201,10 +201,6 @@ services:
     volumes:
       - rclone-config:/config/rclone
       - ./rclone/generate-config.sh:/generate-config.sh:ro
-      # Optional: place rclone/service-account.json on the host to use a
-      # service account instead of OAuth. The mount is silently skipped when
-      # the file does not exist (requires Docker Compose ≥ v2.20).
-      - ./rclone/service-account.json:/config/rclone/service-account.json
     environment:
       RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
       RCLONE_TYPE: ${RCLONE_TYPE:-drive}
@@ -237,8 +233,6 @@ services:
       - rclone-config:/config/rclone:ro
       # Sync script
       - ./rclone/sync.sh:/sync.sh:ro
-      # Service Account File if existing
-      - ./rclone/service-account.json:/config/rclone/service-account.json:ro
     environment:
       # Name of the rclone remote defined in rclone.conf (default: gdrive)
       RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
