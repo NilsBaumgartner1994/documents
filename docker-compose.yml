@@ -204,11 +204,8 @@ services:
     environment:
       RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
       RCLONE_TYPE: ${RCLONE_TYPE:-drive}
-      RCLONE_CLIENT_ID: ${RCLONE_CLIENT_ID:-}
-      RCLONE_CLIENT_SECRET: ${RCLONE_CLIENT_SECRET:-}
       RCLONE_SCOPE: ${RCLONE_SCOPE:-drive}
       RCLONE_TOKEN: ${RCLONE_TOKEN:-}
-      RCLONE_SERVICE_ACCOUNT_FILE: ${RCLONE_SERVICE_ACCOUNT_FILE:-}
     entrypoint: /bin/sh
     command: ["/generate-config.sh"]
     networks: []
