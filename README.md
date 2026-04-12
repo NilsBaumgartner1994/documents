@@ -68,26 +68,43 @@ chmod 600 traefik/acme.json
 
 #### Option A – OAuth (personal Google account, recommended)
 
-Run `rclone config` on your **local machine** (not the server) and follow the
-interactive wizard to create a remote named `gdrive` with `drive` scope.
-Then copy the generated config block to the server:
+First, **install rclone on your local machine** (not the server):
+[https://rclone.org/install/](https://rclone.org/install/)
+
+Then run `rclone config` and follow the interactive wizard to create a remote
+named `gdrive` with `drive` scope.  Copy the resulting token to the server:
 
 ```bash
 # On your local machine:
 rclone config   # create remote named "gdrive", type "drive"
-cat ~/.config/rclone/rclone.conf   # copy the [gdrive] block
+# After completing the OAuth flow, copy the token value:
+cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdrive]
 
-# On the server:
-cp rclone/rclone.conf.example rclone/rclone.conf
-# Paste the [gdrive] block into rclone/rclone.conf
+# On the server – paste the token value into .env:
+# RCLONE_TOKEN={"access_token":"…","refresh_token":"…",…}
 ```
 
 #### Option B – Service account (Google Workspace / automated setups)
 
 1. Create a service account in [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts).
 2. Grant it "Editor" access to the target Google Drive folder.
-3. Download the JSON key and place it at `rclone/service-account.json`.
-4. In `rclone/rclone.conf` uncomment *Option B* and comment out *Option A*.
+3. Download the JSON key and place it on the **host** at `rclone/service-account.json`
+   (i.e. next to `docker-compose.yml`).
+4. Add a bind-mount for the key file to the `rclone-config` service in
+   `docker-compose.yml`:
+   ```yaml
+   rclone-config:
+     volumes:
+       - rclone-config:/config/rclone
+       - ./rclone/generate-config.sh:/generate-config.sh:ro
+       - ./rclone/service-account.json:/config/rclone/service-account.json:ro   # ← add this
+   ```
+5. In `.env`, uncomment and set `RCLONE_SERVICE_ACCOUNT_FILE` to the
+   **in-container** path (this is different from the host path above):
+   ```dotenv
+   RCLONE_SERVICE_ACCOUNT_FILE=/config/rclone/service-account.json
+   ```
+6. Leave `RCLONE_TOKEN` empty (the service account key replaces OAuth).
 
 ### 5 – Start the stack
 
