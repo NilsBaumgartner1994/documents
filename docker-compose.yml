@@ -129,13 +129,7 @@ services:
       # Optional: place rclone/service-account.json on the host to use a
       # service account instead of OAuth. The mount is silently skipped when
       # the file does not exist (requires Docker Compose ≥ v2.20).
-      - type: bind
-        source: ./rclone/service-account.json
-        target: /config/rclone/service-account.json
-        read_only: true
-        required: false
-        bind:
-          create_host_path: false
+      - ./rclone/service-account.json:/config/rclone/service-account.json
     environment:
       RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
       RCLONE_TYPE: ${RCLONE_TYPE:-drive}
