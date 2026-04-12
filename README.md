@@ -176,10 +176,24 @@ or TLS certificate, use the provided `docker-compose.local.yml` override.  It
 disables Traefik and exposes Paperless-ngx directly on port **8000** via plain
 HTTP.
 
+> **How the domain variable works locally**
+>
+> In production, `PAPERLESS_DOMAIN` is your real DNS name and Traefik uses it
+> to route HTTPS traffic and obtain a Let's Encrypt certificate.
+>
+> When running locally, the `docker-compose.local.yml` override:
+> - puts Traefik into an inactive profile (so it never starts), and
+> - sets `PAPERLESS_URL=http://localhost:8000` directly on the Paperless-ngx
+>   container, overriding the value derived from `PAPERLESS_DOMAIN`.
+>
+> This means `PAPERLESS_DOMAIN` is **not used as a real hostname** in local
+> mode – you only need to set it to a non-empty string so Docker Compose does
+> not complain about a missing variable.
+
 ### 1 – Set the required `.env` values
 
 ```dotenv
-PAPERLESS_DOMAIN=localhost          # used only as a label; Traefik is disabled
+PAPERLESS_DOMAIN=localhost          # any non-empty value works; Traefik is disabled
 ACME_EMAIL=local@localhost          # any value is fine – ACME is not used
 PAPERLESS_SECRET_KEY=<random string>
 PAPERLESS_DBPASS=<password>
@@ -199,6 +213,26 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml \
 ```
 
 Open **http://localhost:8000** in your browser and log in.
+
+### Optional – use a custom local hostname
+
+If you prefer a nicer URL (e.g. `http://paperless.local:8000`) instead of
+`localhost`:
+
+1. Set `PAPERLESS_DOMAIN=paperless.local` in `.env`.
+2. Add the hostname to your hosts file:
+
+   **Linux / macOS** – edit `/etc/hosts`:
+   ```
+   127.0.0.1  paperless.local
+   ```
+
+   **Windows** – edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
+   ```
+   127.0.0.1  paperless.local
+   ```
+
+3. Start the stack as usual and open **http://paperless.local:8000**.
 
 > **Note:** The rclone Google Drive sync is included in the local stack as well.
 > If you don't need it, comment out the `rclone-config` and `rclone-sync`
