@@ -171,6 +171,7 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-false}
+      HF_TOKEN: ${HF_TOKEN:-}
     networks:
       - ai-internal
       - proxy
