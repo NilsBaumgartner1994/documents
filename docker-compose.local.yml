@@ -2,8 +2,9 @@
 #   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 #
 # This override skips Traefik and makes Paperless-ngx available at
-# http://localhost:8000 so you can run the stack on your local machine
-# without a public domain or Let's Encrypt certificate.
+# http://localhost:8000 and Open WebUI at http://localhost:3000 so you can
+# run the stack on your local machine without a public domain or
+# Let's Encrypt certificate.
 
 name: paperless
 
@@ -20,3 +21,10 @@ services:
       - "8000:8000"
     environment:
       PAPERLESS_URL: http://localhost:8000
+
+  # Expose Open WebUI directly on port 3000 and use plain HTTP
+  open-webui:
+    ports:
+      - "3000:8080"
+    environment:
+      WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-false}

@@ -117,6 +117,52 @@ services:
       # Tell Traefik to reach this container via the shared proxy network
       - "traefik.docker.network=paperless-proxy"
 
+  # ── Ollama – Local LLM inference server ──────────────────────────────────
+  # Runs large language models locally (e.g. gemma4:e4b).
+  # Models are stored in a persistent volume.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    # Uncomment the following block to enable NVIDIA GPU passthrough.
+    # Requires the NVIDIA Container Toolkit on the host.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    networks:
+      - ai-internal
+
+  # ── Open WebUI – ChatGPT-like interface for local AI ───────────────────
+  # Provides a web-based chat UI that connects to Ollama.
+  # Includes built-in RAG (Retrieval Augmented Generation) support so you
+  # can upload documents and ask questions about their content.
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    volumes:
+      - open-webui-data:/app/backend/data
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      # Disable login requirement for single-user / local setups
+      WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-true}
+    networks:
+      - ai-internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.open-webui.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.${PAPERLESS_DOMAIN}}`)"
+      - "traefik.http.routers.open-webui.entrypoints=websecure"
+      - "traefik.http.routers.open-webui.tls.certresolver=letsencrypt"
+      - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
+      - "traefik.docker.network=paperless-proxy"
+
   # ── rclone-config – Init container: generate rclone.conf from .env ──────
   # Runs once at startup, writes /config/rclone/rclone.conf into the shared
   # rclone-config volume, then exits.  rclone-sync waits for it to finish.
@@ -185,6 +231,9 @@ networks:
   # Isolated backend network – Paperless-ngx dependencies are NOT exposed
   paperless-internal:
     internal: true
+  # Isolated network for AI services (Ollama + Open WebUI)
+  ai-internal:
+    internal: true
 
 # ── Named Volumes ─────────────────────────────────────────────────────────────
 volumes:
@@ -196,3 +245,7 @@ volumes:
   redisdata:
   # Shared volume between rclone-config (writer) and rclone-sync (reader)
   rclone-config:
+  # Ollama model storage (models persist across restarts)
+  ollama-data:
+  # Open WebUI application data (chat history, uploaded documents, settings)
+  open-webui-data:

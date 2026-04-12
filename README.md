@@ -9,6 +9,8 @@ A ready-to-run Docker Compose stack that combines:
 | **[Redis 7](https://redis.io/)** | Task queue / message broker |
 | **[Gotenberg](https://gotenberg.dev/)** | Document → PDF conversion (DOCX, XLSX, …) |
 | **[Apache Tika](https://tika.apache.org/)** | Content extraction for full-text search |
+| **[Ollama](https://ollama.com/)** | Local LLM inference server (runs gemma4:e4b) |
+| **[Open WebUI](https://openwebui.com/)** | ChatGPT-like interface for the local AI |
 | **[rclone](https://rclone.org/)** | Periodic sync of documents to **Google Drive** |
 | **[Traefik v3](https://traefik.io/traefik/)** | Reverse proxy with automatic **Let's Encrypt** TLS |
 
@@ -219,6 +221,86 @@ docker compose exec paperless document_exporter ../export
 
 # Force an immediate Google Drive sync
 docker compose restart rclone-sync
+```
+
+---
+
+## Local AI (Ollama + Open WebUI)
+
+The stack includes a **local AI assistant** powered by [Ollama](https://ollama.com/)
+and [Open WebUI](https://openwebui.com/). This gives you a ChatGPT-like interface
+running entirely on your own hardware – no data leaves your server.
+
+### Pulling the model
+
+After the stack is running, pull the **gemma4:e4b** model (or any other Ollama
+model):
+
+```bash
+docker compose exec ollama ollama pull gemma4:e4b
+```
+
+> **Tip:** The download can be several gigabytes. On subsequent starts the model
+> is already cached in the `ollama-data` volume.
+
+### Accessing the chat interface
+
+| Setup | URL |
+|---|---|
+| **Production** (Traefik) | `https://<OPEN_WEBUI_DOMAIN>` (default: `ai.<PAPERLESS_DOMAIN>`) |
+| **Local** (docker-compose.local.yml) | `http://localhost:3000` |
+
+On first access, Open WebUI will ask you to create an admin account (unless
+`OPEN_WEBUI_AUTH=false` in the local override). After logging in, select the
+**gemma4:e4b** model in the model dropdown and start chatting.
+
+### Asking questions about your documents
+
+Open WebUI has built-in **RAG (Retrieval Augmented Generation)** support.
+You can upload documents directly in the chat using the **+** button or the
+`#` shortcut to reference uploaded files. The AI will then answer questions
+based on the content of those documents.
+
+**Workflow for Paperless-ngx documents:**
+
+1. Export documents from Paperless-ngx (or use the files in the `paperless-media`
+   volume directly).
+2. Upload the relevant PDFs / text files into an Open WebUI chat session.
+3. Ask questions like:
+   - *"Welches Dokument enthält Informationen über X?"*
+   - *"Wann war der Kauf von Y?"*
+   - *"Fasse die Rechnung von Z zusammen."*
+
+> **Advanced:** Open WebUI also supports persistent **Knowledge** collections
+> (under *Workspace → Knowledge*). Create a collection, upload all your
+> Paperless exports into it, and reference it in any chat with `#collection-name`.
+> This way you don't need to re-upload files for every conversation.
+
+### GPU acceleration (optional)
+
+For significantly faster inference, uncomment the `deploy` block in
+`docker-compose.yml` under the `ollama` service to enable NVIDIA GPU
+passthrough. You need the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+installed on the host.
+
+### Useful AI commands
+
+```bash
+# Pull a model
+docker compose exec ollama ollama pull gemma4:e4b
+
+# List downloaded models
+docker compose exec ollama ollama list
+
+# Remove a model
+docker compose exec ollama ollama rm gemma4:e4b
+
+# View Ollama logs
+docker compose logs -f ollama
+
+# View Open WebUI logs
+docker compose logs -f open-webui
 ```
 
 ---
