@@ -1,41 +1,49 @@
 # rclone/rclone.conf.example
 #
-# Copy this file to rclone/rclone.conf and fill in your credentials.
-# The easiest way to generate the token is to run rclone config on your
-# local machine (not on the server) and copy the resulting config block here.
-#
-# Quick-start (on your LOCAL machine, not the server):
-#   1. Install rclone:  https://rclone.org/install/
-#   2. Run:             rclone config
-#   3. Choose:          n (new remote) → name it "gdrive"
-#   4. Choose type:     drive
-#   5. Leave client_id and client_secret blank (use rclone's defaults)
-#   6. Choose scope:    drive (full access) or drive.readonly if you only need read
-#   7. Complete the OAuth flow in your browser
-#   8. Copy the generated [gdrive] section from  ~/.config/rclone/rclone.conf
-#      into this file.
-#
 # ─────────────────────────────────────────────────────────────────────────────
+# NOTE: You no longer need to create rclone.conf manually.
+# The rclone-config init container generates it automatically at every startup
+# from the variables in your .env file.  See .env.example for the full list of
+# variables (RCLONE_TYPE, RCLONE_TOKEN, RCLONE_CLIENT_ID, …).
+#
+# This file is kept only as a reference so you know what the generated config
+# will look like.
+# ─────────────────────────────────────────────────────────────────────────────
+#
 # Option A – OAuth (personal Google account)
 # ─────────────────────────────────────────────────────────────────────────────
-[gdrive]
-type = drive
-# client_id and client_secret can be left empty to use rclone's built-in app
-client_id =
-client_secret =
-# Scope: "drive" = full access; "drive.readonly" = read only
-scope = drive
-# The token JSON is generated automatically by "rclone config"
-token = {"access_token":"YOUR_ACCESS_TOKEN","token_type":"Bearer","refresh_token":"YOUR_REFRESH_TOKEN","expiry":"2099-01-01T00:00:00.000000000Z"}
-
+# How to obtain the token:
+#   1. Install rclone on your LOCAL machine: https://rclone.org/install/
+#   2. Run:  rclone config
+#   3. Choose: n (new remote) → name it "gdrive"
+#   4. Choose type: drive
+#   5. Leave client_id and client_secret blank (uses rclone's built-in app)
+#   6. Choose scope: drive (full access) or drive.readonly
+#   7. Complete the OAuth flow in the browser
+#   8. Copy the "token" value from ~/.config/rclone/rclone.conf into
+#      RCLONE_TOKEN in your .env file.
+#
+# Generated result:
+#
+# [gdrive]
+# type = drive
+# client_id =
+# client_secret =
+# scope = drive
+# token = {"access_token":"…","token_type":"Bearer","refresh_token":"…","expiry":"…"}
+#
 # ─────────────────────────────────────────────────────────────────────────────
 # Option B – Service Account (Google Workspace / automated server setup)
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Create a service account in Google Cloud Console
 # 2. Grant it access to the target Google Drive folder
-# 3. Download the JSON key file and place it next to this config, e.g.:
+# 3. Download the JSON key file, place it in the rclone/ directory, e.g.:
 #      rclone/service-account.json
-# 4. Uncomment the block below and remove / comment out Option A above
+# 4. Mount it into the rclone-config container (add a bind mount in
+#    docker-compose.yml) and set in .env:
+#      RCLONE_SERVICE_ACCOUNT_FILE=/config/rclone/service-account.json
+#
+# Generated result:
 #
 # [gdrive]
 # type = drive
