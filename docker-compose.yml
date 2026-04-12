@@ -159,7 +159,7 @@ services:
   # Includes built-in RAG (Retrieval Augmented Generation) support so you
   # can upload documents and ask questions about their content.
   # Starts as soon as Ollama is ready; ollama-init pulls the model in the
-  # background so the UI is available immediately at http://ai.localhost.
+  # background so the UI is available immediately at http://localhost/ai.
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     restart: unless-stopped
@@ -171,19 +171,32 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-false}
+      # Full public URL of Open WebUI (needed for redirects and OAuth callbacks)
+      WEBUI_URL: ${PAPERLESS_URL:-http://localhost}${OPEN_WEBUI_PATH:-/ai}
+      # Optional: set to speed up HuggingFace model downloads and avoid rate limits
       HF_TOKEN: ${HF_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     networks:
       - ai-internal
       - proxy
     labels:
       - "traefik.enable=true"
-      # HTTP router (localhost / plain HTTP)
-      - "traefik.http.routers.open-webui.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.localhost}`)"
+      # Strip the path prefix before forwarding to the container
+      - "traefik.http.middlewares.open-webui-strip.stripprefix.prefixes=${OPEN_WEBUI_PATH:-/ai}"
+      # HTTP router – path-based: Host(localhost) && PathPrefix(/ai)
+      - "traefik.http.routers.open-webui.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`) && PathPrefix(`${OPEN_WEBUI_PATH:-/ai}`)"
       - "traefik.http.routers.open-webui.entrypoints=web"
+      - "traefik.http.routers.open-webui.middlewares=open-webui-strip"
       # HTTPS router (self-signed by default; set CERT_RESOLVER for Let's Encrypt)
-      - "traefik.http.routers.open-webui-secure.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.localhost}`)"
+      - "traefik.http.routers.open-webui-secure.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`) && PathPrefix(`${OPEN_WEBUI_PATH:-/ai}`)"
       - "traefik.http.routers.open-webui-secure.entrypoints=websecure"
       - "traefik.http.routers.open-webui-secure.tls=true"
+      - "traefik.http.routers.open-webui-secure.middlewares=open-webui-strip"
       - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
       - "traefik.docker.network=paperless-proxy"
 
