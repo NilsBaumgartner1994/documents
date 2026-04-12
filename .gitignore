@@ -7,3 +7,11 @@ rclone/service-account.json
 # ── Traefik ACME certificate store ────────────────────────────────────────
 # Contains TLS private keys – must NOT be committed
 traefik/acme.json
+
+# ── Paperless-ngx local data directories (bind mounts) ────────────────────
+# These hold all Paperless documents, thumbnails, exports and consume data.
+# They can be large and contain private documents – never commit them.
+paperless/data/
+paperless/media/
+paperless/export/
+paperless/consume/

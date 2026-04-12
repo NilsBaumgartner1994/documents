@@ -127,10 +127,18 @@ Open `https://<PAPERLESS_DOMAIN>` in your browser and log in.
 ├── .gitignore
 ├── traefik/
 │   └── acme.json               # TLS certificates (auto-generated, git-ignored)
-└── rclone/
-    ├── rclone.conf.example     # Example rclone config (copy → rclone.conf)
-    └── sync.sh                 # Sync script run inside the rclone container
+├── rclone/
+│   ├── rclone.conf.example     # Example rclone config (copy → rclone.conf)
+│   └── sync.sh                 # Sync script run inside the rclone container
+└── paperless/                  # Local bind-mount directories (git-ignored)
+    ├── data/                   # Paperless internal data (DB cache, index, …)
+    ├── media/                  # Original documents + thumbnails
+    ├── export/                 # Manual document exports
+    └── consume/                # Drop files here to auto-import them
 ```
+
+Docker creates the `paperless/` sub-directories automatically on first start.
+All four directories are listed in `.gitignore` – they are never committed.
 
 ---
 
@@ -139,12 +147,33 @@ Open `https://<PAPERLESS_DOMAIN>` in your browser and log in.
 The `rclone-sync` service runs in the background and calls `rclone sync` on a
 configurable schedule (default: **every hour**).
 
-The following directories are mirrored to Google Drive:
+The following directories are mirrored **from your host to Google Drive**
+(one-way upload only – rclone never downloads files automatically):
 
-| Local (Docker volume) | Google Drive path |
+| Local host path | Google Drive path |
 |---|---|
-| `paperless-media` (originals + thumbnails) | `<RCLONE_DEST_PATH>/media` |
-| `paperless-export` (manual exports) | `<RCLONE_DEST_PATH>/export` |
+| `./paperless/media` (originals + thumbnails) | `<RCLONE_DEST_PATH>/media` |
+| `./paperless/export` (manual exports) | `<RCLONE_DEST_PATH>/export` |
+
+> **Fresh start / empty local directories:** rclone will **not** automatically
+> download anything from Google Drive.  If you need to restore from a backup,
+> run the following restore command once before starting the stack:
+>
+> ```bash
+> # Restore media from Google Drive backup
+> docker run --rm \
+>   -v "$(pwd)/paperless/media:/data/media" \
+>   -v "$(pwd)/rclone:/config/rclone:ro" \
+>   rclone/rclone:latest \
+>   copy gdrive:<RCLONE_DEST_PATH>/media /data/media --progress
+>
+> # Restore export from Google Drive backup
+> docker run --rm \
+>   -v "$(pwd)/paperless/export:/data/export" \
+>   -v "$(pwd)/rclone:/config/rclone:ro" \
+>   rclone/rclone:latest \
+>   copy gdrive:<RCLONE_DEST_PATH>/export /data/export --progress
+> ```
 
 Relevant `.env` options:
 
@@ -158,6 +187,37 @@ View sync logs:
 
 ```bash
 docker compose logs -f rclone-sync
+```
+
+---
+
+## Migrating from Named Volumes
+
+If you set up the stack before bind mounts were introduced (i.e. you have
+existing `paperless-media`, `paperless-data`, `paperless-export`, or
+`paperless-consume` Docker named volumes), migrate your data before restarting:
+
+```bash
+# Stop the stack first
+docker compose down
+
+# Copy each named volume to the new host directory
+for vol in data media export consume; do
+  mkdir -p "./paperless/${vol}"
+  docker run --rm \
+    -v "paperless-${vol}:/src" \
+    -v "$(pwd)/paperless/${vol}:/dst" \
+    alpine sh -c "cp -a /src/. /dst/"
+done
+
+# Start with the new bind-mount configuration
+docker compose up -d
+```
+
+After verifying everything works you can remove the old named volumes:
+
+```bash
+docker volume rm paperless-data paperless-media paperless-export paperless-consume
 ```
 
 ---
@@ -239,6 +299,7 @@ docker compose restart rclone-sync
 - `traefik/acme.json` contains TLS private keys – never commit it.
 - `rclone/rclone.conf` contains OAuth tokens – never commit it.
 - `.env` contains passwords and secret keys – never commit it.
-- All three files are listed in `.gitignore`.
+- `paperless/` contains all your documents – never commit it.
+- All four are listed in `.gitignore`.
 - The internal backend network (`paperless-internal`) is isolated from the
   internet; only Traefik can reach Paperless-ngx via the `proxy` network.
