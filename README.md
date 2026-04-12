@@ -87,7 +87,11 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 #### Option B – Service account (Google Workspace / automated setups)
 
 1. Create a service account in [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts).
-2. Grant it "Editor" access to the target Google Drive folder.
+2. **Enable the Google Drive API** for your project in the Google Cloud Console:
+   [https://console.developers.google.com/apis/api/drive.googleapis.com/overview](https://console.developers.google.com/apis/api/drive.googleapis.com/overview)
+   Without this step rclone will fail with `Error 403: Google Drive API has not been used … or it is disabled`.
+   After enabling the API, wait a minute or two for the change to propagate before starting the stack.
+3. Grant it "Editor" access to the target Google Drive folder.
 3. Download the JSON key and place it on the **host** at `rclone/service-account.json`
    (i.e. next to `docker-compose.yml`).
    The bind-mount is already defined in `docker-compose.yml` and is automatically
