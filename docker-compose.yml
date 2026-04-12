@@ -168,14 +168,8 @@ services:
       - rclone-config:/config/rclone:ro
       # Sync script
       - ./rclone/sync.sh:/sync.sh:ro
-      # Optional: service account key – silently skipped when absent (Compose ≥ v2.20)
-      - type: bind
-        source: ./rclone/service-account.json
-        target: /config/rclone/service-account.json
-        read_only: true
-        required: false
-        bind:
-          create_host_path: false
+      # Service Account File if existing
+      - ./rclone/service-account.json:/config/rclone/service-account.json:ro
     environment:
       # Name of the rclone remote defined in rclone.conf (default: gdrive)
       RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
