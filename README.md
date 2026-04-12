@@ -49,7 +49,7 @@ For production, also update:
 ```dotenv
 PAPERLESS_DOMAIN=paperless.example.com
 PAPERLESS_URL=https://paperless.example.com
-OPEN_WEBUI_DOMAIN=ai.paperless.example.com
+OPEN_WEBUI_PATH=/ai
 OPEN_WEBUI_AUTH=true
 ACME_EMAIL=your-email@example.com          # required for Let's Encrypt (see README)
 ```
@@ -105,12 +105,12 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 docker compose up -d
 ```
 
-Traefik routes traffic by hostname (both HTTP and HTTPS):
+Traefik routes traffic by hostname and path (both HTTP and HTTPS):
 
 | URL | Service |
 |---|---|
 | `http://localhost` / `https://localhost` | Paperless-ngx |
-| `http://ai.localhost` / `https://ai.localhost` | Open WebUI (AI chat) |
+| `http://localhost/ai` / `https://localhost/ai` | Open WebUI (AI chat) |
 
 > **Note:** For localhost the HTTPS certificate is self-signed. Your browser may
 > show a security warning – accept it to continue. For production with a real
@@ -219,8 +219,8 @@ docker compose exec ollama ollama pull <model-name>
 
 | Setup | URL |
 |---|---|
-| **Local** (default) | `http://ai.localhost` |
-| **Production** (Traefik + TLS) | `https://<OPEN_WEBUI_DOMAIN>` |
+| **Local** (default) | `http://localhost/ai` |
+| **Production** (Traefik + TLS) | `https://<PAPERLESS_DOMAIN>/ai` |
 
 On first access, Open WebUI will ask you to create an admin account (unless
 `OPEN_WEBUI_AUTH=false`, which is the default). After logging in, select the
