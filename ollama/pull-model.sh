@@ -12,6 +12,13 @@ until wget -qO /dev/null "${OLLAMA_URL}/api/tags" 2>/dev/null; do
 done
 echo "Ollama is ready."
 
+# Skip the pull if the model is already present in the local Ollama store.
+TAGS=$(wget -qO - "${OLLAMA_URL}/api/tags" 2>/dev/null || true)
+if echo "${TAGS}" | grep -q "\"name\":\"${MODEL}\""; then
+  echo "Model '${MODEL}' already present, skipping pull."
+  exit 0
+fi
+
 echo "Pulling model '${MODEL}' ..."
 
 # Store the streaming response in a temp file so we can both show progress
