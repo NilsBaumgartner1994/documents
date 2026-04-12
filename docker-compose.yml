@@ -206,6 +206,13 @@ services:
       RCLONE_TYPE: ${RCLONE_TYPE:-drive}
       RCLONE_SCOPE: ${RCLONE_SCOPE:-drive}
       RCLONE_TOKEN: ${RCLONE_TOKEN:-}
+      # Optional: own OAuth client credentials (recommended – rclone's built-in
+      # credentials may be restricted by Google for token refresh).
+      # See https://rclone.org/drive/#making-your-own-client-id
+      RCLONE_CLIENT_ID: ${RCLONE_CLIENT_ID:-}
+      RCLONE_CLIENT_SECRET: ${RCLONE_CLIENT_SECRET:-}
+      # Optional: service account JSON path (for Google Workspace / automated setups)
+      RCLONE_SERVICE_ACCOUNT_FILE: ${RCLONE_SERVICE_ACCOUNT_FILE:-}
     entrypoint: /bin/sh
     command: ["/generate-config.sh"]
     networks: []
