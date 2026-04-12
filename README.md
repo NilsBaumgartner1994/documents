@@ -145,6 +145,8 @@ your browser and log in.
 ├── .gitignore
 ├── traefik/
 │   └── acme.json               # TLS certificates (auto-generated, git-ignored)
+├── ollama/
+│   └── pull-model.sh           # Init script: auto-pulls the configured model
 └── rclone/
     ├── rclone.conf.example     # Example rclone config (copy → rclone.conf)
     └── sync.sh                 # Sync script run inside the rclone container
@@ -212,15 +214,16 @@ running entirely on your own hardware – no data leaves your server.
 
 ### Pulling the model
 
-After the stack is running, pull the **gemma4:e4b** model (or any other Ollama
-model):
+The model configured in `OLLAMA_MODEL` (default: **gemma4:e4b**) is
+**pulled automatically** on first start by the `ollama-init` container.
+The download can be several gigabytes; on subsequent starts it is already
+cached in the `ollama-data` volume.
+
+To pull a different or additional model manually:
 
 ```bash
-docker compose exec ollama ollama pull gemma4:e4b
+docker compose exec ollama ollama pull <model-name>
 ```
-
-> **Tip:** The download can be several gigabytes. On subsequent starts the model
-> is already cached in the `ollama-data` volume.
 
 ### Accessing the chat interface
 
@@ -266,8 +269,8 @@ installed on the host.
 ### Useful AI commands
 
 ```bash
-# Pull a model
-docker compose exec ollama ollama pull gemma4:e4b
+# Pull an additional model
+docker compose exec ollama ollama pull <model-name>
 
 # List downloaded models
 docker compose exec ollama ollama list

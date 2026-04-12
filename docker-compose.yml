@@ -144,6 +144,24 @@ services:
     networks:
       - ai-internal
 
+  # ── Ollama Init – Automatically pull the configured model on first start ──
+  # Waits for Ollama to be ready, then pulls OLLAMA_MODEL. Runs once and exits.
+  # open-webui waits for this to complete so the model is available immediately.
+  ollama-init:
+    image: alpine:3
+    restart: "no"
+    depends_on:
+      - ollama
+    volumes:
+      - ./ollama/pull-model.sh:/pull-model.sh:ro
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
+      OLLAMA_BASE_URL: http://ollama:11434
+    entrypoint: /bin/sh
+    command: ["/pull-model.sh"]
+    networks:
+      - ai-internal
+
   # ── Open WebUI – ChatGPT-like interface for local AI ───────────────────
   # Provides a web-based chat UI that connects to Ollama.
   # Includes built-in RAG (Retrieval Augmented Generation) support so you
@@ -152,7 +170,8 @@ services:
     image: ghcr.io/open-webui/open-webui:main
     restart: unless-stopped
     depends_on:
-      - ollama
+      ollama-init:
+        condition: service_completed_successfully
     volumes:
       - open-webui-data:/app/backend/data
     environment:
