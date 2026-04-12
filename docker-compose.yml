@@ -137,11 +137,16 @@ services:
       - paperless-ai-data:/app/data
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
-      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
+      # .env variable PAPERLESS_AI_TOKEN → container env PAPERLESS_API_TOKEN
+      # ⚠️  This is the Paperless-ngx API token, NOT PAPERLESS_SECRET_KEY!
+      # The placeholder value lets the stack start; replace it after creating
+      # a real token (see README Step 6) and restart with: docker compose up -d
+      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:-change-me-to-your-paperless-api-token}
       # Use Google Gemini via the OpenAI-compatible endpoint
       AI_PROVIDER: custom
       CUSTOM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai/
-      CUSTOM_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
+      # .env variable GEMINI_API_KEY → container env CUSTOM_API_KEY
+      CUSTOM_API_KEY: ${GEMINI_API_KEY:-change-me-to-your-gemini-api-key}
       CUSTOM_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
     networks:
       # paperless-internal to reach the Paperless-ngx API

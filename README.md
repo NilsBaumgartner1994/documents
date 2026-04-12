@@ -40,13 +40,12 @@ Open `.env` and fill in **at least** the required values:
 ```dotenv
 PAPERLESS_SECRET_KEY=<random 64-char string>
 PAPERLESS_DBPASS=<strong password>
-PAPERLESS_AI_TOKEN=<Paperless-ngx API token>
-GEMINI_API_KEY=<your Google Gemini API key>
 ```
 
-> **Hinweis:** `PAPERLESS_AI_TOKEN` wird erst nach dem ersten Start benötigt
-> (siehe Schritt 6). `GEMINI_API_KEY` erhältst du kostenlos unter
-> [Google AI Studio](https://aistudio.google.com/app/apikey).
+> **Hinweis:** `PAPERLESS_AI_TOKEN` und `GEMINI_API_KEY` werden erst nach dem
+> ersten Start benötigt (siehe Schritt 6). Die Platzhalter in `.env.example`
+> ermöglichen den Start des gesamten Stacks – du aktualisierst die Werte
+> später und startest dann mit `docker compose up -d` neu.
 
 The defaults are set for **local use** (`localhost`).
 For production, also update:
@@ -162,6 +161,10 @@ Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
    PAPERLESS_AI_TOKEN=dein-kopierter-token
    ```
 
+> **Variablen-Mapping:** In der `.env` heißt die Variable `PAPERLESS_AI_TOKEN`.
+> In `docker-compose.yml` wird sie als `PAPERLESS_API_TOKEN` an den
+> Paperless-AI Container übergeben und füllt den Setup-Wizard automatisch vor.
+
 #### Schritt 2: Gemini API-Key erstellen
 
 1. Öffne [Google AI Studio](https://aistudio.google.com/app/apikey).
@@ -212,7 +215,7 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 | Feld | Was eingeben | Erklärung |
 |---|---|---|
 | **Paperless-ngx API URL** | `http://paperless:8000` | Der Docker-Service-Name aus `docker-compose.yml`. **Nicht** `localhost` verwenden – das funktioniert nicht zwischen Docker-Containern! **Ohne** `/api` am Ende eingeben – der Pfad wird automatisch angehängt. |
-| **API Token** | Den Token aus Schritt 1 einfügen | z.B. `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0` – das ist **nicht** der `PAPERLESS_SECRET_KEY`! |
+| **API Token** | Den Token aus Schritt 1 einfügen | z.B. `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0` – das ist **nicht** der `PAPERLESS_SECRET_KEY`! Wenn du `PAPERLESS_AI_TOKEN` bereits in `.env` gesetzt hast, ist dieses Feld vorausgefüllt. |
 | **Paperless-ngx Username** | Dein Paperless-ngx Admin-Benutzername | Der Benutzername, den du in Schritt 5 (`createsuperuser`) erstellt hast. |
 
 > **⚠️ Häufiger Fehler:** `localhost` oder `127.0.0.1` funktioniert **nicht**
@@ -349,11 +352,11 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 
 ### Relevante `.env`-Variablen
 
-| Variable | Beschreibung |
-|---|---|
-| `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (**nicht** `PAPERLESS_SECRET_KEY`!) – erstellt unter `/admin/authtoken/tokenproxy/` |
-| `GEMINI_API_KEY` | Google Gemini API-Key ([hier erstellen](https://aistudio.google.com/app/apikey)) |
-| `GEMINI_MODEL` | Modell (Standard: `gemini-2.0-flash`) |
+| Variable in `.env` | Container-Variable | Beschreibung |
+|---|---|---|
+| `PAPERLESS_AI_TOKEN` | `PAPERLESS_API_TOKEN` | API-Token aus Paperless-ngx (**nicht** `PAPERLESS_SECRET_KEY`!) – erstellt unter `/admin/authtoken/tokenproxy/`. Füllt den Wizard (Tab 2) automatisch vor. |
+| `GEMINI_API_KEY` | `CUSTOM_API_KEY` | Google Gemini API-Key ([hier erstellen](https://aistudio.google.com/app/apikey)). Füllt den Wizard (Tab 3) automatisch vor. |
+| `GEMINI_MODEL` | `CUSTOM_MODEL` | Modell (Standard: `gemini-2.0-flash`) |
 
 > **⚠️ `PAPERLESS_SECRET_KEY` vs. `PAPERLESS_AI_TOKEN`:**
 >
