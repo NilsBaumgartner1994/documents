@@ -70,7 +70,7 @@ services:
   # ── Apache Tika – Content extraction (enables full-text search for many
   #    file formats such as DOCX, XLSX, ODT, …) ─────────────────────────────
   tika:
-    image: docker.io/apache/tika:3.1.0
+    image: docker.io/apache/tika:3.1.0.0
     restart: unless-stopped
     networks:
       - paperless-internal
