@@ -1,16 +1,15 @@
-# Paperless-ngx + Google Drive Sync + Traefik
+# Paperless-ngx + Paperless-AI + Google Drive Sync + Traefik
 
 A ready-to-run Docker Compose stack that combines:
 
 | Component | Purpose |
 |---|---|
 | **[Paperless-ngx](https://docs.paperless-ngx.com/)** | Document management system (scan, OCR, tag, search) |
+| **[Paperless-AI](https://github.com/clusterzx/paperless-ai)** | Automatic AI tagging & classification for new documents (powered by Google Gemini) |
 | **[PostgreSQL 16](https://www.postgresql.org/)** | Database for Paperless-ngx |
 | **[Redis 7](https://redis.io/)** | Task queue / message broker |
 | **[Gotenberg](https://gotenberg.dev/)** | Document → PDF conversion (DOCX, XLSX, …) |
 | **[Apache Tika](https://tika.apache.org/)** | Content extraction for full-text search |
-| **[Ollama](https://ollama.com/)** | Local LLM inference server (runs gemma4:e4b) |
-| **[Open WebUI](https://openwebui.com/)** | ChatGPT-like interface for the local AI |
 | **[rclone](https://rclone.org/)** | Periodic sync of documents to **Google Drive** |
 | **[Traefik v3](https://traefik.io/traefik/)** | Reverse proxy with TLS (self-signed locally, optional Let's Encrypt for production) |
 
@@ -41,16 +40,20 @@ Open `.env` and fill in **at least** the required values:
 ```dotenv
 PAPERLESS_SECRET_KEY=<random 64-char string>
 PAPERLESS_DBPASS=<strong password>
+PAPERLESS_AI_TOKEN=<Paperless-ngx API token>
+GEMINI_API_KEY=<your Google Gemini API key>
 ```
 
-The defaults are set for **local use** (`localhost` / `ai.localhost`).
+> **Hinweis:** `PAPERLESS_AI_TOKEN` wird erst nach dem ersten Start benötigt
+> (siehe Schritt 6). `GEMINI_API_KEY` erhältst du kostenlos unter
+> [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+The defaults are set for **local use** (`localhost`).
 For production, also update:
 
 ```dotenv
 PAPERLESS_DOMAIN=paperless.example.com
 PAPERLESS_URL=https://paperless.example.com
-OPEN_WEBUI_PATH=/ai
-OPEN_WEBUI_AUTH=true
 ACME_EMAIL=your-email@example.com          # required for Let's Encrypt (see README)
 ```
 
@@ -105,12 +108,16 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 docker compose up -d
 ```
 
-Traefik routes traffic by hostname and path (both HTTP and HTTPS):
+Traefik routes traffic by hostname (both HTTP and HTTPS):
 
 | URL | Service |
 |---|---|
-| `http://localhost` / `https://localhost` | Paperless-ngx |
-| `http://localhost/ai` / `https://localhost/ai` | Open WebUI (AI chat) |
+| `http://localhost` / `https://localhost` | Paperless-ngx (Dokumentenverwaltung) |
+| `http://localhost:3000` | Paperless-AI Web UI (Einrichtung & Übersicht) |
+
+> **Hinweis:** Paperless-AI hat eine **eigene Web-Oberfläche auf Port 3000**.
+> Diese ist *nicht* über Traefik erreichbar, sondern direkt über den Port.
+> Du öffnest sie einfach im Browser unter `http://<deine-IP>:3000`.
 
 > **Note:** For localhost the HTTPS certificate is self-signed. Your browser may
 > show a security warning – accept it to continue. For production with a real
@@ -126,6 +133,51 @@ docker compose exec paperless python3 manage.py createsuperuser
 Open `http://localhost` (local) or `https://<PAPERLESS_DOMAIN>` (production) in
 your browser and log in.
 
+### 6 – Set up Paperless-AI
+
+Paperless-AI erkennt neue Dokumente automatisch und vergibt Titel, Tags,
+Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
+
+#### Schritt 1: Paperless-ngx API-Token erstellen
+
+1. Öffne Paperless-ngx im Browser (`http://localhost`).
+2. Gehe zu **Einstellungen → API** (oder im Django-Admin: `/admin/auth/token/`).
+3. Erstelle einen neuen Token und kopiere ihn.
+4. Trage den Token in die `.env`-Datei ein:
+   ```dotenv
+   PAPERLESS_AI_TOKEN=dein-kopierter-token
+   ```
+
+#### Schritt 2: Gemini API-Key erstellen
+
+1. Öffne [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. Klicke auf **"Create API key"**, wähle ein Projekt und kopiere den Key.
+3. Trage den Key in die `.env`-Datei ein:
+   ```dotenv
+   GEMINI_API_KEY=dein-gemini-api-key
+   ```
+
+> **Tipp:** Der kostenlose Gemini-Tarif reicht für typische Dokumentenmengen
+> im Heimgebrauch völlig aus.
+
+#### Schritt 3: Container neu starten
+
+```bash
+docker compose up -d
+```
+
+#### Schritt 4: Paperless-AI Web UI öffnen
+
+Öffne die Paperless-AI Oberfläche im Browser:
+
+```
+http://localhost:3000
+```
+
+Beim ersten Start wirst du durch einen **Einrichtungsassistenten** geführt.
+Dort kannst du die Verbindung zu Paperless-ngx und die AI-Einstellungen
+überprüfen und anpassen.
+
 ---
 
 ## Directory structure
@@ -135,8 +187,6 @@ your browser and log in.
 ├── docker-compose.yml          # Main stack definition
 ├── .env.example                # Template for environment variables
 ├── .gitignore
-├── ollama/
-│   └── pull-model.sh           # Init script: auto-pulls the configured model
 └── rclone/
     ├── rclone.conf.example     # Example rclone config (copy → rclone.conf)
     └── sync.sh                 # Sync script run inside the rclone container
@@ -196,85 +246,55 @@ docker compose restart rclone-sync
 
 ---
 
-## Local AI (Ollama + Open WebUI)
+## Paperless-AI (automatische Dokument-Klassifikation)
 
-The stack includes a **local AI assistant** powered by [Ollama](https://ollama.com/)
-and [Open WebUI](https://openwebui.com/). This gives you a ChatGPT-like interface
-running entirely on your own hardware – no data leaves your server.
+Der Stack enthält [Paperless-AI](https://github.com/clusterzx/paperless-ai)
+von **clusterzx**. Dieser Dienst überwacht Paperless-ngx auf neue Dokumente
+und vergibt automatisch:
 
-### Pulling the model
+- **Titel**
+- **Tags**
+- **Korrespondenten**
+- **Dokumenttypen**
 
-The model configured in `OLLAMA_MODEL` (default: **gemma4:e4b**) is
-**pulled automatically** on first start by the `ollama-init` container.
-The download can be several gigabytes; models are stored in the host
-directory `./ollama/models` (configurable via `OLLAMA_DATA_DIR` in `.env`)
-and **survive a full `docker compose down -v`** – you only download each
-model once.
+Die AI-Analyse läuft über **Google Gemini** (Cloud-API). Es wird kein lokales
+LLM oder GPU benötigt – ein kostenloser Gemini-API-Key reicht aus.
 
-To pull a different or additional model manually:
+### Web UI aufrufen
 
-```bash
-docker compose exec ollama ollama pull <model-name>
-```
-
-### Accessing the chat interface
+Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 
 | Setup | URL |
 |---|---|
-| **Local** (default) | `http://localhost/ai` |
-| **Production** (Traefik + TLS) | `https://<PAPERLESS_DOMAIN>/ai` |
+| **Lokal** (Standard) | `http://localhost:3000` |
+| **Remote / Server** | `http://<deine-server-ip>:3000` |
 
-On first access, Open WebUI will ask you to create an admin account (unless
-`OPEN_WEBUI_AUTH=false`, which is the default). After logging in, select the
-**gemma4:e4b** model in the model dropdown and start chatting.
+> **Wichtig:** Die Web UI läuft auf **Port 3000** und ist *nicht* über
+> Traefik geroutet. Du rufst sie direkt über den Port auf.
 
-### Asking questions about your documents
+### Was kann die Web UI?
 
-Open WebUI has built-in **RAG (Retrieval Augmented Generation)** support.
-You can upload documents directly in the chat using the **+** button or the
-`#` shortcut to reference uploaded files. The AI will then answer questions
-based on the content of those documents.
+- Einrichtungsassistent beim ersten Start
+- Übersicht über verarbeitete Dokumente
+- AI-Einstellungen anpassen (Modell, Prompt, etc.)
+- Verbindung zu Paperless-ngx verwalten
 
-**Workflow for Paperless-ngx documents:**
+### Relevante `.env`-Variablen
 
-1. Export documents from Paperless-ngx (or use the files in the `paperless-media`
-   volume directly).
-2. Upload the relevant PDFs / text files into an Open WebUI chat session.
-3. Ask questions like:
-   - *"Welches Dokument enthält Informationen über X?"*
-   - *"Wann war der Kauf von Y?"*
-   - *"Fasse die Rechnung von Z zusammen."*
+| Variable | Beschreibung |
+|---|---|
+| `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (Einstellungen → API) |
+| `GEMINI_API_KEY` | Google Gemini API-Key ([hier erstellen](https://aistudio.google.com/app/apikey)) |
+| `GEMINI_MODEL` | Modell (Standard: `gemini-2.0-flash`) |
 
-> **Advanced:** Open WebUI also supports persistent **Knowledge** collections
-> (under *Workspace → Knowledge*). Create a collection, upload all your
-> Paperless exports into it, and reference it in any chat with `#collection-name`.
-> This way you don't need to re-upload files for every conversation.
-
-### GPU acceleration (optional)
-
-For significantly faster inference, uncomment the `deploy` block in
-`docker-compose.yml` under the `ollama` service to enable NVIDIA GPU
-passthrough. You need the
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-installed on the host.
-
-### Useful AI commands
+### Nützliche Befehle
 
 ```bash
-# Pull an additional model
-docker compose exec ollama ollama pull <model-name>
+# Paperless-AI Logs anzeigen
+docker compose logs -f paperless-ai
 
-# List downloaded models
-docker compose exec ollama ollama list
-
-# Remove a model
-docker compose exec ollama ollama rm gemma4:e4b
-
-# View Ollama logs
-docker compose logs -f ollama
-
-# View Open WebUI logs
-docker compose logs -f open-webui
+# Paperless-AI neu starten (z.B. nach .env-Änderungen)
+docker compose restart paperless-ai
 ```
 
 ---
