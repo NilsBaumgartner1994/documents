@@ -115,90 +115,39 @@ services:
       # Tell Traefik to reach this container via the shared proxy network
       - "traefik.docker.network=paperless-proxy"
 
-  # ── Ollama – Local LLM inference server ──────────────────────────────────
-  # Runs large language models locally (e.g. gemma4:e4b).
-  # Models are stored in a host directory so they survive "docker compose down -v".
-  # The path defaults to ./ollama/models but can be overridden via OLLAMA_DATA_DIR in .env.
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    volumes:
-      - ${OLLAMA_DATA_DIR:-./ollama/models}:/root/.ollama
-    # Uncomment the following block to enable NVIDIA GPU passthrough.
-    # Requires the NVIDIA Container Toolkit on the host.
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-    networks:
-      - ai-internal
-
-  # ── Ollama Init – Automatically pull the configured model on first start ──
-  # Waits for Ollama to be ready, then pulls OLLAMA_MODEL. Runs once and exits.
-  # open-webui waits for this to complete so the model is available immediately.
-  ollama-init:
-    image: alpine:3
-    restart: "no"
-    depends_on:
-      - ollama
-    volumes:
-      - ./ollama/pull-model.sh:/pull-model.sh:ro
-    environment:
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
-      OLLAMA_BASE_URL: http://ollama:11434
-    entrypoint: /bin/sh
-    command: ["/pull-model.sh"]
-    networks:
-      - ai-internal
-
-  # ── Open WebUI – ChatGPT-like interface for local AI ───────────────────
-  # Provides a web-based chat UI that connects to Ollama.
-  # Includes built-in RAG (Retrieval Augmented Generation) support so you
-  # can upload documents and ask questions about their content.
-  # Starts as soon as Ollama is ready; ollama-init pulls the model in the
-  # background so the UI is available immediately at http://localhost/ai.
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
+  # ── Paperless-AI – Automatic AI tagging for Paperless-ngx ───────────────
+  # Watches Paperless-ngx for new documents and automatically assigns titles,
+  # tags, correspondents, and document types using the Google Gemini API.
+  # Web UI is available at http://<host>:3000 after first start.
+  #
+  # First-time setup:
+  #   1. Start the stack and open http://<host>:3000
+  #   2. Complete the setup wizard (or restart the container to apply the
+  #      environment variables pre-filled below).
+  paperless-ai:
+    image: clusterzx/paperless-ai
+    container_name: paperless-ai
     restart: unless-stopped
     depends_on:
-      ollama:
+      paperless:
         condition: service_started
+    ports:
+      - "3000:3000"
     volumes:
-      - open-webui-data:/app/backend/data
+      - paperless-ai-data:/app/data
     environment:
-      OLLAMA_BASE_URL: http://ollama:11434
-      WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-false}
-      # Full public URL of Open WebUI (needed for redirects and OAuth callbacks)
-      WEBUI_URL: ${PAPERLESS_URL:-http://localhost}${OPEN_WEBUI_PATH:-/ai}
-      # Optional: set to speed up HuggingFace model downloads and avoid rate limits
-      HF_TOKEN: ${HF_TOKEN:-}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
+      PAPERLESS_API_URL: http://paperless:8000/api
+      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
+      # Use Google Gemini via the OpenAI-compatible endpoint
+      AI_PROVIDER: custom
+      CUSTOM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai/
+      CUSTOM_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
+      CUSTOM_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
     networks:
-      - ai-internal
+      # paperless-internal to reach the Paperless-ngx API
+      - paperless-internal
+      # proxy gives internet access for outbound Gemini API calls
       - proxy
-    labels:
-      - "traefik.enable=true"
-      # Strip the path prefix before forwarding to the container
-      - "traefik.http.middlewares.open-webui-strip.stripprefix.prefixes=${OPEN_WEBUI_PATH:-/ai}"
-      # HTTP router – path-based: Host(localhost) && PathPrefix(/ai)
-      - "traefik.http.routers.open-webui.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`) && PathPrefix(`${OPEN_WEBUI_PATH:-/ai}`)"
-      - "traefik.http.routers.open-webui.entrypoints=web"
-      - "traefik.http.routers.open-webui.middlewares=open-webui-strip"
-      # HTTPS router (self-signed by default; set CERT_RESOLVER for Let's Encrypt)
-      - "traefik.http.routers.open-webui-secure.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`) && PathPrefix(`${OPEN_WEBUI_PATH:-/ai}`)"
-      - "traefik.http.routers.open-webui-secure.entrypoints=websecure"
-      - "traefik.http.routers.open-webui-secure.tls=true"
-      - "traefik.http.routers.open-webui-secure.middlewares=open-webui-strip"
-      - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
-      - "traefik.docker.network=paperless-proxy"
 
   # ── rclone-config – Init container: generate rclone.conf from .env ──────
   # Runs once at startup, writes /config/rclone/rclone.conf into the shared
@@ -266,9 +215,6 @@ networks:
   # Isolated backend network – Paperless-ngx dependencies are NOT exposed
   paperless-internal:
     internal: true
-  # Network for AI services (Ollama + Open WebUI).
-  # Not marked internal so Ollama can reach registry.ollama.ai to pull models.
-  ai-internal:
 
 # ── Named Volumes ─────────────────────────────────────────────────────────────
 volumes:
@@ -280,5 +226,5 @@ volumes:
   redisdata:
   # Shared volume between rclone-config (writer) and rclone-sync (reader)
   rclone-config:
-  # Open WebUI application data (chat history, uploaded documents, settings)
-  open-webui-data:
+  # Paperless-AI application data (config, RAG index, chat history)
+  paperless-ai-data:
