@@ -206,8 +206,10 @@ running entirely on your own hardware – no data leaves your server.
 
 The model configured in `OLLAMA_MODEL` (default: **gemma4:e4b**) is
 **pulled automatically** on first start by the `ollama-init` container.
-The download can be several gigabytes; on subsequent starts it is already
-cached in the `ollama-data` volume.
+The download can be several gigabytes; models are stored in the host
+directory `./ollama/models` (configurable via `OLLAMA_DATA_DIR` in `.env`)
+and **survive a full `docker compose down -v`** – you only download each
+model once.
 
 To pull a different or additional model manually:
 

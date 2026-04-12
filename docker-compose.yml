@@ -117,12 +117,13 @@ services:
 
   # ── Ollama – Local LLM inference server ──────────────────────────────────
   # Runs large language models locally (e.g. gemma4:e4b).
-  # Models are stored in a persistent volume.
+  # Models are stored in a host directory so they survive "docker compose down -v".
+  # The path defaults to ./ollama/models but can be overridden via OLLAMA_DATA_DIR in .env.
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
     volumes:
-      - ollama-data:/root/.ollama
+      - ${OLLAMA_DATA_DIR:-./ollama/models}:/root/.ollama
     # Uncomment the following block to enable NVIDIA GPU passthrough.
     # Requires the NVIDIA Container Toolkit on the host.
     # deploy:
@@ -279,7 +280,5 @@ volumes:
   redisdata:
   # Shared volume between rclone-config (writer) and rclone-sync (reader)
   rclone-config:
-  # Ollama model storage (models persist across restarts)
-  ollama-data:
   # Open WebUI application data (chat history, uploaded documents, settings)
   open-webui-data:
