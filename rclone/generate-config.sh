@@ -9,11 +9,12 @@
 #   RCLONE_REMOTE          – remote name used in the config block (default: gdrive)
 #   RCLONE_TYPE            – backend type (default: drive)
 #   RCLONE_SCOPE           – OAuth scope (default: drive)
+#   RCLONE_CLIENT_ID       – OAuth client ID
+#   RCLONE_CLIENT_SECRET   – OAuth client secret
 #
-# OAuth (personal Google account):
-#   RCLONE_TOKEN           – token JSON from "rclone config" (required)
-#   RCLONE_CLIENT_ID       – OAuth client ID   (optional, leave empty for rclone defaults)
-#   RCLONE_CLIENT_SECRET   – OAuth client secret (optional, leave empty for rclone defaults)
+# The OAuth token is NOT stored in .env. It is written to the rclone-config
+# volume by the one-time "rclone-auth" setup service and is preserved here
+# across restarts.
 
 set -e
 
@@ -25,18 +26,25 @@ SCOPE="${RCLONE_SCOPE:-drive}"
 
 mkdir -p "${CONFIG_DIR}"
 
-if [ -z "${RCLONE_TOKEN:-}" ]; then
-    echo "ERROR: RCLONE_TOKEN is not set. Add it to your .env file." >&2
-    exit 1
+# Preserve the OAuth token that was saved by the rclone-auth setup service.
+EXISTING_TOKEN=""
+if [ -f "${CONFIG_FILE}" ]; then
+    EXISTING_TOKEN=$(grep "^token = " "${CONFIG_FILE}" | sed 's/^token = //' || true)
 fi
-echo "Generating rclone.conf (OAuth mode) ..."
+
+echo "Generating rclone.conf ..."
 cat > "${CONFIG_FILE}" <<EOF
 [${REMOTE}]
 type = ${TYPE}
 client_id = ${RCLONE_CLIENT_ID:-}
 client_secret = ${RCLONE_CLIENT_SECRET:-}
 scope = ${SCOPE}
-token = ${RCLONE_TOKEN}
 EOF
 
-echo "rclone.conf written to ${CONFIG_FILE}"
+if [ -n "${EXISTING_TOKEN}" ]; then
+    echo "token = ${EXISTING_TOKEN}" >> "${CONFIG_FILE}"
+    echo "rclone.conf written to ${CONFIG_FILE} (existing token preserved)"
+else
+    echo "rclone.conf written to ${CONFIG_FILE}"
+    echo "WARNING: No OAuth token found. Run 'docker compose run --rm rclone-auth' to authorize."
+fi

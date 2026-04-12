@@ -68,21 +68,29 @@ chmod 600 traefik/acme.json
 
 #### Configure rclone for Google Drive
 
-First, **install rclone on your local machine** (not the server):
-[https://rclone.org/install/](https://rclone.org/install/)
+1. Create an OAuth client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+   - Application type: **Desktop app**
+   - Add the Google Drive API to your project
+   - Download the client ID and secret
 
-Then run `rclone config` and follow the interactive wizard to create a remote
-named `gdrive` with `drive` scope.  Copy the resulting token to the server:
+2. Set them in `.env`:
+   ```dotenv
+   RCLONE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   RCLONE_CLIENT_SECRET=your-client-secret
+   ```
 
-```bash
-# On your local machine:
-rclone config   # create remote named "gdrive", type "drive"
-# After completing the OAuth flow, copy the token value:
-cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdrive]
+3. Run the one-time authorization (opens a browser for OAuth):
+   ```bash
+   docker compose run --rm rclone-auth
+   ```
+   The token is saved automatically to a Docker volume – nothing gets added to `.env`.
 
-# On the server – paste the token value into .env:
-# RCLONE_TOKEN={"access_token":"…","refresh_token":"…",…}
-```
+   > **Remote server?** Forward port 53682 with an SSH tunnel first so the
+   > OAuth callback can reach the container:
+   > ```bash
+   > ssh -L 53682:localhost:53682 your-server
+   > ```
+   > Then run `docker compose run --rm rclone-auth` in the server session.
 
 ### 5 – Start the stack
 

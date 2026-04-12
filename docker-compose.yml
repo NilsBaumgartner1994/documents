@@ -132,10 +132,35 @@ services:
       RCLONE_CLIENT_ID: ${RCLONE_CLIENT_ID:-}
       RCLONE_CLIENT_SECRET: ${RCLONE_CLIENT_SECRET:-}
       RCLONE_SCOPE: ${RCLONE_SCOPE:-drive}
-      RCLONE_TOKEN: ${RCLONE_TOKEN:-}
     entrypoint: /bin/sh
     command: ["/generate-config.sh"]
     networks: []
+
+  # ── rclone-auth – One-time OAuth setup (run manually, then never again) ──
+  # Usage: docker compose run --rm rclone-auth
+  # This writes the OAuth token to the rclone-config volume so that
+  # rclone-sync can authenticate without any token in .env.
+  # If Docker runs on a remote server, forward port 53682 first:
+  #   ssh -L 53682:localhost:53682 your-server
+  rclone-auth:
+    image: rclone/rclone:latest
+    profiles: [setup]
+    ports:
+      - "53682:53682"
+    volumes:
+      - rclone-config:/config/rclone
+      - ./rclone/auth.sh:/auth.sh:ro
+    environment:
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
+      RCLONE_TYPE: ${RCLONE_TYPE:-drive}
+      RCLONE_CLIENT_ID: ${RCLONE_CLIENT_ID:-}
+      RCLONE_CLIENT_SECRET: ${RCLONE_CLIENT_SECRET:-}
+      RCLONE_SCOPE: ${RCLONE_SCOPE:-drive}
+    entrypoint: /bin/sh
+    command: ["/auth.sh"]
+    networks: []
+    stdin_open: true
+    tty: true
 
   # ── rclone – Google Drive synchronisation ────────────────────────────────
   # Periodically mirrors the Paperless media and export directories to a
