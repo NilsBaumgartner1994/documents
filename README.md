@@ -18,10 +18,9 @@ A ready-to-run Docker Compose stack that combines:
 
 ## Prerequisites
 
-- A Linux server with Docker ≥ 24 and Docker Compose v2 (`docker compose`) installed.
-- A public domain name pointing to the server's IP (required for Let's Encrypt).
-- Ports **80** and **443** open in your firewall / security group.
-- A Google account (for Google Drive sync).
+- A Linux machine (or macOS / Windows with Docker Desktop) with Docker ≥ 24 and Docker Compose v2 (`docker compose`).
+- **For production:** A public domain name pointing to the server's IP, ports **80** and **443** open.
+- **Optional:** A Google account (for Google Drive sync).
 
 ---
 
@@ -37,13 +36,22 @@ cp .env.example .env
 
 ### 2 – Edit `.env`
 
-Open `.env` and fill in **all required values**:
+Open `.env` and fill in **at least** the required values:
 
 ```dotenv
-ACME_EMAIL=your-email@example.com       # Let's Encrypt notifications
-PAPERLESS_DOMAIN=paperless.example.com  # Your public domain
 PAPERLESS_SECRET_KEY=<random 64-char string>
 PAPERLESS_DBPASS=<strong password>
+```
+
+The defaults are set for **local use** (`localhost` / `ai.localhost`).
+For production, also update:
+
+```dotenv
+PAPERLESS_DOMAIN=paperless.example.com
+PAPERLESS_URL=https://paperless.example.com
+OPEN_WEBUI_DOMAIN=ai.paperless.example.com
+OPEN_WEBUI_AUTH=true
+ACME_EMAIL=your-email@example.com          # required for Let's Encrypt
 ```
 
 Generate a secure secret key:
@@ -107,8 +115,15 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 docker compose up -d
 ```
 
-Traefik will automatically obtain a TLS certificate for `PAPERLESS_DOMAIN` on
-first start (requires DNS to be configured and ports 80/443 to be reachable).
+Traefik routes traffic by hostname:
+
+| URL | Service |
+|---|---|
+| `http://localhost` | Paperless-ngx |
+| `http://ai.localhost` | Open WebUI (AI chat) |
+
+For production, Traefik will additionally obtain a TLS certificate for your
+domain via Let's Encrypt (requires DNS + ports 80/443 to be reachable).
 
 ### 6 – Create the Paperless-ngx admin user
 
@@ -116,7 +131,8 @@ first start (requires DNS to be configured and ports 80/443 to be reachable).
 docker compose exec paperless python3 manage.py createsuperuser
 ```
 
-Open `https://<PAPERLESS_DOMAIN>` in your browser and log in.
+Open `http://localhost` (local) or `https://<PAPERLESS_DOMAIN>` (production) in
+your browser and log in.
 
 ---
 
@@ -161,43 +177,6 @@ View sync logs:
 ```bash
 docker compose logs -f rclone-sync
 ```
-
----
-
-## Running locally (no public domain)
-
-If you just want to try the stack on your own machine without a public domain
-or TLS certificate, use the provided `docker-compose.local.yml` override.  It
-disables Traefik and exposes Paperless-ngx directly on port **8000** via plain
-HTTP.
-
-### 1 – Set the required `.env` values
-
-```dotenv
-PAPERLESS_DOMAIN=localhost          # used only as a label; Traefik is disabled
-ACME_EMAIL=local@localhost          # any value is fine – ACME is not used
-PAPERLESS_SECRET_KEY=<random string>
-PAPERLESS_DBPASS=<password>
-```
-
-### 2 – Start the stack with the local override
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
-```
-
-### 3 – Create the admin user
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml \
-  exec paperless python3 manage.py createsuperuser
-```
-
-Open **http://localhost:8000** in your browser and log in.
-
-> **Note:** The rclone Google Drive sync is included in the local stack as well.
-> If you don't need it, comment out the `rclone-config` and `rclone-sync`
-> services in `docker-compose.yml`.
 
 ---
 
@@ -247,11 +226,11 @@ docker compose exec ollama ollama pull gemma4:e4b
 
 | Setup | URL |
 |---|---|
-| **Production** (Traefik) | `https://<OPEN_WEBUI_DOMAIN>` (default: `ai.<PAPERLESS_DOMAIN>`) |
-| **Local** (docker-compose.local.yml) | `http://localhost:3000` |
+| **Local** (default) | `http://ai.localhost` |
+| **Production** (Traefik + TLS) | `https://<OPEN_WEBUI_DOMAIN>` |
 
 On first access, Open WebUI will ask you to create an admin account (unless
-`OPEN_WEBUI_AUTH=false` in the local override). After logging in, select the
+`OPEN_WEBUI_AUTH=false`, which is the default). After logging in, select the
 **gemma4:e4b** model in the model dropdown and start chatting.
 
 ### Asking questions about your documents
@@ -307,8 +286,10 @@ docker compose logs -f open-webui
 
 ## Traefik details
 
-- HTTP (port 80) is automatically redirected to HTTPS (port 443).
-- TLS certificates are issued by **Let's Encrypt** via the HTTP-01 challenge.
+- Traefik listens on port **80** (HTTP) and **443** (HTTPS).
+- For **localhost** use, everything works over plain HTTP – no certificates needed.
+- For **production**, TLS certificates are issued by **Let's Encrypt** via the
+  HTTP-01 challenge (requires `ACME_EMAIL` to be set to a real e-mail address).
 - Certificates are stored in `traefik/acme.json` (git-ignored).
 - The Traefik dashboard is **disabled** by default. To enable it, add
   `--api.dashboard=true` to the `traefik` command in `docker-compose.yml`

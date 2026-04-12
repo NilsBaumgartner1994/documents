@@ -2,24 +2,27 @@ name: paperless
 
 services:
 
-  # ── Traefik – Reverse Proxy with automatic Let's Encrypt TLS ──────────────
+  # ── Traefik – Reverse Proxy ──────────────────────────────────────────────
+  # Works out of the box for localhost (plain HTTP on port 80).
+  # For production with a real domain, set ACME_EMAIL in .env to enable
+  # automatic Let's Encrypt TLS on port 443.
   traefik:
     image: traefik:v3.3
     container_name: traefik
     restart: unless-stopped
     command:
       - "--log.level=INFO"
-      # HTTP entrypoint – redirects all traffic to HTTPS
+      # HTTP entrypoint
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       # HTTPS entrypoint
       - "--entrypoints.websecure.address=:443"
       # Docker provider – discovers services via Docker labels
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       # Let's Encrypt ACME certificate resolver (HTTP-01 challenge)
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in .env}"
+      # Uses a dummy default so the stack starts without ACME_EMAIL for
+      # local use; real certificates require a valid e-mail address.
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-noreply@localhost}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
@@ -101,7 +104,7 @@ services:
       PAPERLESS_TIKA_ENDPOINT: http://tika:9998
       # Application settings
       PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?Set PAPERLESS_SECRET_KEY in .env}
-      PAPERLESS_URL: https://${PAPERLESS_DOMAIN:?Set PAPERLESS_DOMAIN in .env}
+      PAPERLESS_URL: ${PAPERLESS_URL:-http://localhost}
       PAPERLESS_TIME_ZONE: ${TZ:-Europe/Berlin}
       USERMAP_UID: ${USERMAP_UID:-1000}
       USERMAP_GID: ${USERMAP_GID:-1000}
@@ -110,9 +113,13 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.paperless.rule=Host(`${PAPERLESS_DOMAIN}`)"
-      - "traefik.http.routers.paperless.entrypoints=websecure"
-      - "traefik.http.routers.paperless.tls.certresolver=letsencrypt"
+      # HTTP router (localhost / plain HTTP)
+      - "traefik.http.routers.paperless.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.paperless.entrypoints=web"
+      # HTTPS router (production with TLS)
+      - "traefik.http.routers.paperless-secure.rule=Host(`${PAPERLESS_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.paperless-secure.entrypoints=websecure"
+      - "traefik.http.routers.paperless-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.paperless.loadbalancer.server.port=8000"
       # Tell Traefik to reach this container via the shared proxy network
       - "traefik.docker.network=paperless-proxy"
@@ -150,16 +157,19 @@ services:
       - open-webui-data:/app/backend/data
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
-      # Disable login requirement for single-user / local setups
-      WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-true}
+      WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-false}
     networks:
       - ai-internal
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.open-webui.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.${PAPERLESS_DOMAIN}}`)"
-      - "traefik.http.routers.open-webui.entrypoints=websecure"
-      - "traefik.http.routers.open-webui.tls.certresolver=letsencrypt"
+      # HTTP router (localhost / plain HTTP)
+      - "traefik.http.routers.open-webui.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.localhost}`)"
+      - "traefik.http.routers.open-webui.entrypoints=web"
+      # HTTPS router (production with TLS)
+      - "traefik.http.routers.open-webui-secure.rule=Host(`${OPEN_WEBUI_DOMAIN:-ai.localhost}`)"
+      - "traefik.http.routers.open-webui-secure.entrypoints=websecure"
+      - "traefik.http.routers.open-webui-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
       - "traefik.docker.network=paperless-proxy"
 
