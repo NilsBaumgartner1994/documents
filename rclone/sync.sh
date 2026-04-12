@@ -12,6 +12,11 @@ REMOTE="${RCLONE_REMOTE:-gdrive}"
 DEST="${RCLONE_DEST_PATH:-paperless-backup}"
 INTERVAL="${SYNC_INTERVAL_SECONDS:-3600}"
 
+# Copy the read-only config to a writable location so rclone can persist
+# refreshed OAuth tokens without hitting a read-only filesystem error.
+RCLONE_CONFIG_FILE="/tmp/rclone.conf"
+cp /config/rclone/rclone.conf "${RCLONE_CONFIG_FILE}"
+
 echo "============================================"
 echo " rclone Google Drive sync started"
 echo " Remote  : ${REMOTE}:${DEST}"
@@ -23,6 +28,7 @@ while true; do
 
     # Sync media directory (original documents + thumbnails)
     rclone sync /data/media "${REMOTE}:${DEST}/media" \
+        --config "${RCLONE_CONFIG_FILE}" \
         --log-level INFO \
         --stats 60s \
         --transfers 4 \
@@ -34,6 +40,7 @@ while true; do
 
     # Sync export directory (Paperless-ngx document exports)
     rclone sync /data/export "${REMOTE}:${DEST}/export" \
+        --config "${RCLONE_CONFIG_FILE}" \
         --log-level INFO \
         --stats 60s \
         --transfers 4 \

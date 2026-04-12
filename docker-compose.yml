@@ -258,9 +258,9 @@ networks:
   # Isolated backend network – Paperless-ngx dependencies are NOT exposed
   paperless-internal:
     internal: true
-  # Isolated network for AI services (Ollama + Open WebUI)
+  # Network for AI services (Ollama + Open WebUI).
+  # Not marked internal so Ollama can reach registry.ollama.ai to pull models.
   ai-internal:
-    internal: true
 
 # ── Named Volumes ─────────────────────────────────────────────────────────────
 volumes:
