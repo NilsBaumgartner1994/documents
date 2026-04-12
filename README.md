@@ -148,7 +148,7 @@ Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
 #### Schritt 1: Paperless-ngx API-Token erstellen
 
 1. Öffne Paperless-ngx im Browser (`http://localhost`).
-2. Logge dich mit dem Admin-User ein (erstellt in Schritt 5).
+2. Logge dich mit dem Admin-User ein (erstellt in Quick-start Schritt 5 oben).
 3. Öffne den **Django-Admin**-Bereich:
    ```
    http://localhost/admin/authtoken/tokenproxy/
@@ -211,7 +211,7 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 
 | Feld | Was eingeben | Erklärung |
 |---|---|---|
-| **Paperless-ngx API URL** | `http://paperless:8000` | Der Docker-Service-Name aus `docker-compose.yml`. **Nicht** `localhost` verwenden – das funktioniert nicht zwischen Docker-Containern! Der `/api`-Pfad wird automatisch angehängt. |
+| **Paperless-ngx API URL** | `http://paperless:8000` | Der Docker-Service-Name aus `docker-compose.yml`. **Nicht** `localhost` verwenden – das funktioniert nicht zwischen Docker-Containern! **Ohne** `/api` am Ende eingeben – der Pfad wird automatisch angehängt. |
 | **API Token** | Den Token aus Schritt 1 einfügen | z.B. `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0` – das ist **nicht** der `PAPERLESS_SECRET_KEY`! |
 | **Paperless-ngx Username** | Dein Paperless-ngx Admin-Benutzername | Der Benutzername, den du in Schritt 5 (`createsuperuser`) erstellt hast. |
 
