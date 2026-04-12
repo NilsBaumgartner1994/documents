@@ -170,6 +170,14 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       WEBUI_AUTH: ${OPEN_WEBUI_AUTH:-false}
+      # Optional: set to speed up HuggingFace model downloads and avoid rate limits
+      HF_TOKEN: ${HF_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     networks:
       - ai-internal
       - proxy
