@@ -45,7 +45,7 @@ GEMINI_API_KEY=<your Google Gemini API key>
 ```
 
 > **Hinweis:** `PAPERLESS_AI_TOKEN` wird erst nach dem ersten Start benötigt
-> (siehe Schritt 5). `GEMINI_API_KEY` erhältst du kostenlos unter
+> (siehe Schritt 6). `GEMINI_API_KEY` erhältst du kostenlos unter
 > [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 The defaults are set for **local use** (`localhost`).
@@ -141,7 +141,7 @@ Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
 #### Schritt 1: Paperless-ngx API-Token erstellen
 
 1. Öffne Paperless-ngx im Browser (`http://localhost`).
-2. Gehe zu **Einstellungen → API** (oder: `/admin/authtoken/tokenproxy/`).
+2. Gehe zu **Einstellungen → API** (oder im Django-Admin: `/admin/auth/token/`).
 3. Erstelle einen neuen Token und kopiere ihn.
 4. Trage den Token in die `.env`-Datei ein:
    ```dotenv
