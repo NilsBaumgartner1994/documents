@@ -133,9 +133,9 @@ services:
         source: ./rclone/service-account.json
         target: /config/rclone/service-account.json
         read_only: true
+        required: false
         bind:
           create_host_path: false
-          required: false
     environment:
       RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
       RCLONE_TYPE: ${RCLONE_TYPE:-drive}
@@ -173,9 +173,9 @@ services:
         source: ./rclone/service-account.json
         target: /config/rclone/service-account.json
         read_only: true
+        required: false
         bind:
           create_host_path: false
-          required: false
     environment:
       # Name of the rclone remote defined in rclone.conf (default: gdrive)
       RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive}
