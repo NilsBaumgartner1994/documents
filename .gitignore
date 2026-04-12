@@ -3,7 +3,3 @@
 .env
 rclone/rclone.conf
 rclone/service-account.json
-
-# ── Ollama model cache ────────────────────────────────────────────────────
-# Downloaded models can be several gigabytes – never commit them
-ollama/models/
