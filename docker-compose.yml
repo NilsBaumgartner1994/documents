@@ -160,7 +160,7 @@ services:
       # Use GitHub Copilot via the OpenAI-compatible copilot-api wrapper
       AI_PROVIDER: custom
       CUSTOM_BASE_URL: http://copilot-api:4141/v1/
-      CUSTOM_API_KEY: ${GH_TOKEN:?Set GH_TOKEN in .env}
+      CUSTOM_API_KEY: copilot
       CUSTOM_MODEL: ${COPILOT_MODEL:-gpt-4o}
     networks:
       # paperless-internal to reach the Paperless-ngx API and copilot-api
@@ -245,4 +245,3 @@ volumes:
   rclone-config:
   # Paperless-AI application data (config, RAG index, chat history)
   paperless-ai-data:
-
