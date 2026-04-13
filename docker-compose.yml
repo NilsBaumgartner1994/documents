@@ -99,6 +99,9 @@ services:
       PAPERLESS_TIME_ZONE: ${TZ:-Europe/Berlin}
       USERMAP_UID: ${USERMAP_UID:-1000}
       USERMAP_GID: ${USERMAP_GID:-1000}
+      # Auto-create admin superuser on first start (no manual createsuperuser needed)
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-admin}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:-}
     networks:
       - paperless-internal
       - proxy
@@ -124,6 +127,10 @@ services:
   #   1. Start the stack and open http://<host>:3000
   #   2. Complete the setup wizard (or restart the container to apply the
   #      environment variables pre-filled below).
+  #
+  # API token:
+  #   If PAPERLESS_ADMIN_USER and PAPERLESS_ADMIN_PASSWORD are set in .env,
+  #   the token is fetched automatically at startup – no manual step required.
   paperless-ai:
     image: clusterzx/paperless-ai
     container_name: paperless-ai
@@ -135,9 +142,15 @@ services:
       - "3000:3000"
     volumes:
       - paperless-ai-data:/app/data
+      - ./paperless-ai/fetch-token.sh:/fetch-token.sh:ro
+    entrypoint: ["/bin/sh", "/fetch-token.sh"]
+    command: ["npm", "start"]
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
-      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
+      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:-}
+      # Admin credentials for automatic token fetching (when PAPERLESS_API_TOKEN is empty)
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:-}
       # Use Google Gemini via the OpenAI-compatible endpoint
       AI_PROVIDER: custom
       CUSTOM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai/
