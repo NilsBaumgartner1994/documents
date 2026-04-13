@@ -116,24 +116,15 @@ services:
       - "traefik.docker.network=paperless-proxy"
 
   # ── Ollama – Local LLM inference engine ─────────────────────────────────
-  # Runs large language models locally. The default model (gemma4:e4b) is
-  # pulled automatically by the ollama-pull init container below.
-  # If a NVIDIA GPU is available, uncomment the "deploy" block for GPU
-  # acceleration.
+  # Runs large language models locally on the CPU. The default model
+  # (gemma4:e4b) is pulled automatically by the ollama-pull init container
+  # below.
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
     restart: unless-stopped
     volumes:
       - ollama-data:/root/.ollama
-    # Uncomment the following block to enable NVIDIA GPU acceleration:
-    #deploy:
-    #  resources:
-    #    reservations:
-    #      devices:
-    #        - driver: nvidia
-    #          count: all
-    #          capabilities: [gpu]
     networks:
       - paperless-internal
       # proxy gives internet access for initial model download

@@ -19,7 +19,7 @@ A ready-to-run Docker Compose stack that combines:
 ## Prerequisites
 
 - A Linux machine (or macOS / Windows with Docker Desktop) with Docker ≥ 24 and Docker Compose v2 (`docker compose`).
-- **Recommended:** A machine with at least 16 GB RAM and a NVIDIA GPU for fast local AI inference (CPU-only works but is slower).
+- **Recommended:** A machine with at least 16 GB RAM for local AI inference (runs on CPU).
 - **For production:** A public domain name pointing to the server's IP, ports **80** and **443** open.
 - **Optional:** A Google account (for Google Drive sync).
 
@@ -324,8 +324,7 @@ und vergibt automatisch:
 - **Dokumenttypen**
 
 Die AI-Analyse läuft über **Ollama** mit dem Modell `gemma4:e4b` – komplett
-lokal, ohne Cloud-API oder API-Key. Eine GPU wird empfohlen, ist aber nicht
-zwingend erforderlich (CPU-only funktioniert, ist aber langsamer).
+lokal auf der CPU, ohne Cloud-API oder API-Key.
 
 ### Web UI aufrufen
 
