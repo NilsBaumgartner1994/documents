@@ -54,7 +54,12 @@ if [ -z "${PAPERLESS_API_TOKEN}" ] || [ "${PAPERLESS_API_TOKEN}" = "auto" ]; the
                 "${TOKEN_URL}" 2>&1) || true
 
             # Extract the token value from the JSON response {"token":"<value>"}
-            TOKEN=$(echo "${RESPONSE}" | sed -n 's/.*"token" *: *"\([^"]*\)".*/\1/p')
+            # Try jq first (if available), fall back to sed-based extraction.
+            if command -v jq >/dev/null 2>&1; then
+                TOKEN=$(echo "${RESPONSE}" | jq -r '.token // empty' 2>/dev/null)
+            else
+                TOKEN=$(echo "${RESPONSE}" | sed -n 's/.*"token" *: *"\([^"]*\)".*/\1/p')
+            fi
 
             if [ -n "${TOKEN}" ]; then
                 export PAPERLESS_API_TOKEN="${TOKEN}"
