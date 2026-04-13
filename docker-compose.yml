@@ -127,16 +127,25 @@ services:
     stop_grace_period: 30s
     # Retry loop: if the Copilot token exchange fails on startup (e.g. transient
     # network error) the server never binds port 4141.  Instead of crashing and
-    # relying solely on Docker's exponential-backoff restart, we retry every 15 s
-    # inside the container so the health-check window is not exhausted.
+    # relying solely on Docker's exponential-backoff restart, we retry up to 10
+    # times (15 s apart) inside the container so the health-check window is not
+    # exhausted.  After 10 failures Docker's own restart policy takes over.
+    # The token is written to the auth file so it is not exposed as a CLI argument
+    # in process listings.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        while true; do
-          bun run /app/dist/main.js start -g "$GH_TOKEN" && exit 0
-          echo "[copilot-api] Startup failed, retrying in 15 s..."
+        mkdir -p /root/.local/share/copilot-api
+        printf '%s' "$$GH_TOKEN" > /root/.local/share/copilot-api/github_token
+        max=10; n=0
+        while [ "$$n" -lt "$$max" ]; do
+          bun run /app/dist/main.js start && exit 0
+          n=$$(($$n + 1))
+          echo "[copilot-api] Startup failed (attempt $$n/$$max), retrying in 15 s..."
           sleep 15
         done
+        echo "[copilot-api] Exceeded $$max start attempts – letting Docker restart."
+        exit 1
     environment:
       GH_TOKEN: ${GH_TOKEN:?Set GH_TOKEN in .env}
     healthcheck:
