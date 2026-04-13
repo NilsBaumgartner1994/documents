@@ -223,15 +223,10 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 
 ##### Tab 3: AI Settings
 
-| Feld | Was eingeben | Erklärung |
-|---|---|---|
-| **AI Provider** | `Custom / OpenAI compatible` auswählen | Wir nutzen die Gemini-API über den OpenAI-kompatiblen Endpunkt. |
-| **Custom Base URL** | `https://generativelanguage.googleapis.com/v1beta/openai/` | OpenAI-kompatibler Endpunkt für Google Gemini. |
-| **Custom API Key** | Dein Gemini API-Key aus Schritt 2 | Der Key von Google AI Studio. |
-| **Custom Model** | `gemini-2.0-flash` | Schnelles Modell im kostenlosen Tarif. Alternativ: `gemini-1.5-flash`, `gemini-1.5-pro`. |
-
-> **Tipp:** Falls die Felder vorausgefüllt sind (aus den Umgebungsvariablen
-> in `docker-compose.yml`), kontrolliere nur die Werte und klicke weiter.
+AI_PROVIDER: custom
+CUSTOM_BASE_URL: http://copilot-api:4141/v1/
+CUSTOM_API_KEY: copilot   # any non-empty value; copilot-api does not validate it
+CUSTOM_MODEL: ${COPILOT_MODEL:-claude-3.5-sonnet}
 
 ---
 
