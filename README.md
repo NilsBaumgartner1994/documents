@@ -40,12 +40,12 @@ Open `.env` and fill in **at least** the required values:
 ```dotenv
 PAPERLESS_SECRET_KEY=<random 64-char string>
 PAPERLESS_DBPASS=<strong password>
-PAPERLESS_AI_TOKEN=<Paperless-ngx API token>
 GEMINI_API_KEY=<your Google Gemini API key>
 ```
 
-> **Hinweis:** `PAPERLESS_AI_TOKEN` wird erst nach dem ersten Start benötigt
-> (siehe Schritt 6). `GEMINI_API_KEY` erhältst du kostenlos unter
+> **Hinweis:** Der Paperless-ngx **API-Token** (`PAPERLESS_AI_TOKEN`) wird
+> **nicht** in `.env` gesetzt. Er wird im Paperless-AI Setup-Wizard
+> eingegeben (siehe Schritt 6). `GEMINI_API_KEY` erhältst du kostenlos unter
 > [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 The defaults are set for **local use** (`localhost`).
@@ -157,10 +157,11 @@ Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
 5. Wähle deinen Admin-User aus dem Dropdown und klicke **"Save"**.
 6. Kopiere den generierten Token (eine lange Zeichenkette, z.B.
    `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0`).
-7. Trage den Token in die `.env`-Datei ein:
-   ```dotenv
-   PAPERLESS_AI_TOKEN=dein-kopierter-token
-   ```
+
+> **Hinweis:** Den Token musst du dir merken – du gibst ihn gleich im
+> Paperless-AI Setup-Wizard ein (Schritt 3, Tab 2). Er wird **nicht** in der
+> `.env`-Datei gespeichert, sondern ausschließlich über den Wizard
+> konfiguriert.
 
 #### Schritt 2: Gemini API-Key erstellen
 
@@ -174,13 +175,7 @@ Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
 > **Tipp:** Der kostenlose Gemini-Tarif reicht für typische Dokumentenmengen
 > im Heimgebrauch völlig aus.
 
-#### Schritt 3: Container neu starten
-
-```bash
-docker compose up -d
-```
-
-#### Schritt 4: Paperless-AI Setup-Wizard durchlaufen
+#### Schritt 3: Paperless-AI Setup-Wizard durchlaufen
 
 Öffne die Paperless-AI Oberfläche im Browser:
 
@@ -215,9 +210,15 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 | **API Token** | Den Token aus Schritt 1 einfügen | z.B. `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0` – das ist **nicht** der `PAPERLESS_SECRET_KEY`! |
 | **Paperless-ngx Username** | Dein Paperless-ngx Admin-Benutzername | Der Benutzername, den du in Schritt 5 (`createsuperuser`) erstellt hast. |
 
-> **⚠️ Häufiger Fehler:** `localhost` oder `127.0.0.1` funktioniert **nicht**
-> im Docker-Bridge-Netzwerk. Der Container-Name `paperless` wird über das
-> interne Docker-Netzwerk (`paperless-internal`) aufgelöst.
+> **⚠️ Häufiger Fehler – URL-Format:**
+> Das Feld erwartet die URL **ohne** `/api`. Der Pfad wird automatisch
+> angehängt. Wenn im Feld bereits `http://paperless:8000` vorausgefüllt ist,
+> einfach so lassen.
+
+> **⚠️ Häufiger Fehler – Hostname:**
+> `localhost` oder `127.0.0.1` funktioniert **nicht** im Docker-Bridge-Netzwerk.
+> Der Container-Name `paperless` wird über das interne Docker-Netzwerk
+> (`paperless-internal`) aufgelöst.
 
 ---
 
@@ -351,16 +352,21 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 
 | Variable | Beschreibung |
 |---|---|
-| `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (**nicht** `PAPERLESS_SECRET_KEY`!) – erstellt unter `/admin/authtoken/tokenproxy/` |
 | `GEMINI_API_KEY` | Google Gemini API-Key ([hier erstellen](https://aistudio.google.com/app/apikey)) |
 | `GEMINI_MODEL` | Modell (Standard: `gemini-2.0-flash`) |
 
-> **⚠️ `PAPERLESS_SECRET_KEY` vs. `PAPERLESS_AI_TOKEN`:**
+> **Hinweis:** Der Paperless-ngx API-Token wird **nicht** über `.env`
+> konfiguriert. Er wird ausschließlich im Paperless-AI Setup-Wizard
+> eingegeben und im persistenten Datenvolumen gespeichert.
+> Der Grund: Docker-Umgebungsvariablen überschreiben die Wizard-Konfiguration
+> still und leise, was zu **401-Fehlern** führen kann.
+
+> **⚠️ `PAPERLESS_SECRET_KEY` vs. API Token:**
 >
 > | Variable | Zweck |
 > |---|---|
 > | `PAPERLESS_SECRET_KEY` | Djangos interner Schlüssel für Sessions/Hashing – wird **nie** als API-Token genutzt |
-> | `PAPERLESS_AI_TOKEN` | Der API-Token, mit dem Paperless-AI auf die Paperless-ngx API zugreift |
+> | API Token (Wizard) | Der API-Token, mit dem Paperless-AI auf die Paperless-ngx API zugreift – wird im Setup-Wizard eingegeben |
 
 ### Nützliche Befehle
 
@@ -370,6 +376,97 @@ docker compose logs -f paperless-ai
 
 # Paperless-AI neu starten (z.B. nach .env-Änderungen)
 docker compose restart paperless-ai
+```
+
+---
+
+## Troubleshooting
+
+### 401 Unauthorized: `/api/documents/`
+
+```
+paperless-paperless-1 | [WARNING] [django.request] Unauthorized: /api/documents/
+paperless-ai          | [ERROR] fetching document count: Request failed with status code 401
+```
+
+**Ursache:** Der API-Token, den Paperless-AI verwendet, wird von
+Paperless-ngx nicht akzeptiert.
+
+**Checkliste:**
+
+1. **Token korrekt erstellt?**
+   Öffne `http://localhost/admin/authtoken/tokenproxy/` und prüfe, ob ein
+   Token für deinen Admin-User existiert.
+
+2. **Token korrekt im Wizard eingegeben?**
+   Öffne `http://localhost:3000`, logge dich ein und prüfe unter
+   *Settings → Connection* ob der Token korrekt hinterlegt ist.
+
+3. **Keine Docker-Umgebungsvariable die den Wizard überschreibt?**
+   Falls `PAPERLESS_API_TOKEN` in `docker-compose.yml` als Umgebungsvariable
+   gesetzt ist, überschreibt sie den Wizard-Wert. In diesem Stack wird der
+   Token absichtlich **nicht** als Docker-Env-Var übergeben. Falls du
+   `docker-compose.yml` angepasst hast, entferne die Zeile:
+   ```yaml
+   # NICHT setzen – der Token kommt aus dem Wizard:
+   # PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN}
+   ```
+
+4. **Container neu starten:**
+   ```bash
+   docker compose restart paperless-ai
+   ```
+
+---
+
+### 400 Bad Request von Gemini API (checkStatus)
+
+```
+Error generating text with Custom OpenAI: BadRequestError: 400 status code (no body)
+    at async CustomOpenAIService.checkStatus
+```
+
+**Ursache:** Der Health-Check von Paperless-AI (`checkStatus`) sendet eine
+Test-Anfrage an die Gemini-API. Dieser Endpunkt unterstützt nicht alle
+Parameter des OpenAI-Protokolls (z.B. `max_tokens`), was zu einem `400`
+führen kann.
+
+**Hinweis:** Dieser Fehler betrifft **nur den Status-Check**, nicht die
+eigentliche Dokumenten-Analyse. Dokumente werden in der Regel trotzdem
+korrekt verarbeitet.
+
+**Checkliste:**
+
+1. **Gemini API-Key gültig?**
+   Teste den Key unter [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+2. **Gemini API aktiviert?**
+   Stelle sicher, dass die „Generative Language API" in deinem
+   Google-Cloud-Projekt aktiviert ist.
+
+3. **Custom Base URL korrekt?**
+   Die URL muss **ohne** abschließenden Slash sein:
+   ```
+   https://generativelanguage.googleapis.com/v1beta/openai
+   ```
+
+4. **Modellname korrekt?**
+   Standardwert: `gemini-2.0-flash`. Andere Optionen: `gemini-1.5-flash`,
+   `gemini-1.5-pro`.
+
+---
+
+### Logs prüfen
+
+```bash
+# Alle Logs anzeigen
+docker compose logs -f
+
+# Nur Paperless-AI Logs
+docker compose logs -f paperless-ai
+
+# Nur Paperless-ngx Logs
+docker compose logs -f paperless
 ```
 
 ---

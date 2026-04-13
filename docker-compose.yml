@@ -137,10 +137,16 @@ services:
       - paperless-ai-data:/app/data
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
-      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
+      # PAPERLESS_API_TOKEN is NOT set here on purpose.
+      # The Paperless-ngx API token is entered in the setup wizard
+      # (http://<host>:3000) and saved to the persistent data volume.
+      # Setting it as a Docker env var would silently override the
+      # wizard-saved value after every container restart (dotenv
+      # does not overwrite existing env vars).
+      #
       # Use Google Gemini via the OpenAI-compatible endpoint
       AI_PROVIDER: custom
-      CUSTOM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai/
+      CUSTOM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai
       CUSTOM_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
       CUSTOM_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
     networks:
