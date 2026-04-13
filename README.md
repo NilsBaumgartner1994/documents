@@ -280,8 +280,8 @@ Nach dem Abschluss des Wizards startet Paperless-AI automatisch und
 ├── docker-compose.yml          # Main stack definition
 ├── .env.example                # Template for environment variables
 ├── .gitignore
-├── copilot/                    # GitHub Copilot config mount point
-│   └── .gitkeep
+├── copilot/
+│   └── generate-config.sh      # Init script to generate Copilot config from OAuth token
 ├── ollama/
 │   └── pull-model.sh           # Init script to pull the Ollama model on startup
 └── rclone/
@@ -434,20 +434,23 @@ nahtlos mit Paperless-AI.
 - Ein **GitHub-Konto mit aktivem Copilot-Abo** (Individual, Business oder
   Enterprise).
 - Ein IDE-Plugin (VS Code, IntelliJ, Vim, …) muss **einmalig** installiert
-  und mit deinem GitHub-Konto angemeldet werden, damit die nötigen
-  Konfigurationsdateien erstellt werden.
+  und mit deinem GitHub-Konto angemeldet werden, um den OAuth-Token zu
+  erhalten.
 
-### Schritt 1: GitHub Copilot Konfiguration vorbereiten
+### Schritt 1: GitHub OAuth-Token finden
 
-Nach dem Anmelden in einem unterstützten IDE-Plugin werden die
-Konfigurationsdateien automatisch erstellt:
+Nach dem Anmelden in einem unterstützten IDE-Plugin wird der Token
+automatisch gespeichert:
 
-| Betriebssystem | Pfad |
-|---|---|
-| **Linux / macOS** | `~/.config/github-copilot/` |
-| **Windows** | `%LOCALAPPDATA%/github-copilot/` |
+```bash
+# Linux / macOS:
+cat ~/.config/github-copilot/hosts.json
 
-Der Ordner enthält `apps.json` oder `hosts.json` (mit dem GitHub OAuth Token).
+# Windows (PowerShell):
+type $env:LOCALAPPDATA\github-copilot\hosts.json
+```
+
+Suche den Wert von `"oauth_token"` – er beginnt meist mit `gho_` oder `ghu_`.
 
 ### Schritt 2: `.env` konfigurieren
 
@@ -465,11 +468,11 @@ CUSTOM_MODEL=gpt-4o
 # übereinstimmen):
 COPILOT_TOKEN=mein-geheimer-token
 
-# Pfad zur lokalen GitHub Copilot Konfiguration:
-COPILOT_CONFIG_PATH=~/.config/github-copilot
+# Dein GitHub OAuth-Token (das ist alles, was du brauchst!):
+GITHUB_COPILOT_OAUTH_TOKEN=gho_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-> **Tipp:** Generiere ein sicheres Token mit:
+> **Tipp:** Generiere ein sicheres `COPILOT_TOKEN` mit:
 > ```bash
 > python3 -c "import secrets; print(secrets.token_hex(32))"
 > ```
@@ -479,6 +482,9 @@ COPILOT_CONFIG_PATH=~/.config/github-copilot
 ```bash
 docker compose --profile copilot up -d
 ```
+
+Der `copilot-config`-Init-Container erzeugt automatisch die nötige
+Konfigurationsdatei aus deinem OAuth-Token – kein Config-Pfad-Mounting nötig.
 
 ### Schritt 4: Paperless-AI Setup-Wizard
 
@@ -509,6 +515,9 @@ Gängige Modelle: `gpt-4o`, `gpt-4o-mini`, `gpt-4`, `claude-sonnet-4`,
 ```bash
 # Copilot API Proxy Logs anzeigen
 docker compose logs -f copilot-openai-api
+
+# Copilot Config Init-Container Logs anzeigen
+docker compose logs copilot-config
 
 # Copilot API testen
 curl -X POST http://localhost:9191/v1/chat/completions \
