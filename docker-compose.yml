@@ -115,9 +115,29 @@ services:
       # Tell Traefik to reach this container via the shared proxy network
       - "traefik.docker.network=paperless-proxy"
 
+  # ── copilot-api – GitHub Copilot → OpenAI-compatible bridge ─────────────
+  # Exposes the GitHub Copilot models via an OpenAI-compatible REST API so
+  # that Paperless-AI (and any other OpenAI client) can use them locally.
+  # Requires a GitHub account with an active Copilot subscription.
+  #
+  # First-time setup:
+  #   Obtain a GitHub token with Copilot access:
+  #     npx copilot-api@latest auth
+  #   Then set COPILOT_GH_TOKEN in your .env file.
+  copilot-api:
+    image: nghyane/copilot-api:latest
+    container_name: copilot-api
+    restart: unless-stopped
+    environment:
+      GH_TOKEN: ${COPILOT_GH_TOKEN:?Set COPILOT_GH_TOKEN in .env}
+    networks:
+      # proxy gives outbound internet access so the container can reach GitHub
+      - proxy
+
   # ── Paperless-AI – Automatic AI tagging for Paperless-ngx ───────────────
   # Watches Paperless-ngx for new documents and automatically assigns titles,
-  # tags, correspondents, and document types using the Google Gemini API.
+  # tags, correspondents, and document types using the GitHub Copilot API
+  # (via the local copilot-api bridge above).
   # Web UI is available at http://<host>:3000 after first start.
   #
   # First-time setup:
@@ -131,6 +151,8 @@ services:
     depends_on:
       paperless:
         condition: service_started
+      copilot-api:
+        condition: service_started
     ports:
       - "3000:3000"
     volumes:
@@ -138,15 +160,15 @@ services:
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
       PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
-      # Use Google Gemini via the OpenAI-compatible endpoint
+      # Use the local copilot-api bridge as an OpenAI-compatible endpoint
       AI_PROVIDER: custom
-      CUSTOM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai/
-      CUSTOM_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
-      CUSTOM_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      CUSTOM_BASE_URL: http://copilot-api:4141/v1
+      CUSTOM_API_KEY: no-key-needed
+      CUSTOM_MODEL: ${COPILOT_MODEL:-gpt-4o}
     networks:
       # paperless-internal to reach the Paperless-ngx API
       - paperless-internal
-      # proxy gives internet access for outbound Gemini API calls
+      # proxy to reach the copilot-api container
       - proxy
 
   # ── rclone-config – Init container: generate rclone.conf from .env ──────
