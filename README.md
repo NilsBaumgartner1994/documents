@@ -257,7 +257,7 @@ Nach dem Abschluss des Wizards startet Paperless-AI automatisch und
 
 ---
 
-## File naming
+## Document file naming
 
 By default, Paperless-ngx stores every document under a machine-generated path that contains no readable information.  With the `PAPERLESS_FILENAME_FORMAT` variable (set in `docker-compose.yml` and `.env.example`) the stack configures a **human-readable, numbered** naming scheme instead:
 
@@ -286,8 +286,6 @@ You can customise the format by changing `PAPERLESS_FILENAME_FORMAT` in your `.e
 > **Note:** Changing the format after documents have already been ingested renames the existing files on disk.  Make sure you have a recent backup (e.g. via `rclone-sync`) before changing this value on a running installation.
 
 ---
-
-
 
 The `rclone-sync` service runs in the background and calls `rclone sync` on a
 configurable schedule (default: **every hour**).
