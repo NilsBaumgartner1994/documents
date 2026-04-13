@@ -121,7 +121,7 @@ services:
   # Requires a valid GitHub token with Copilot access (GH_TOKEN in .env).
   # Authenticate first on your local machine:  npx copilot-api@latest auth
   copilot-api:
-    image: nghyane/copilot-api:latest
+    image: nghyane/copilot-api:0.3.3
     container_name: copilot-api
     restart: unless-stopped
     environment:
