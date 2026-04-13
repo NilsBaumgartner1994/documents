@@ -123,14 +123,31 @@ services:
     image: ghcr.io/ericc-ch/copilot-api:latest
     container_name: copilot-api
     restart: unless-stopped
+    # Allow up to 30 s for a clean shutdown before Docker force-kills the container
+    stop_grace_period: 30s
+    # Retry loop: if the Copilot token exchange fails on startup (e.g. transient
+    # network error) the server never binds port 4141.  Instead of crashing and
+    # relying solely on Docker's exponential-backoff restart, we retry every 15 s
+    # inside the container so the health-check window is not exhausted.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          bun run /app/dist/main.js start -g "$GH_TOKEN" && exit 0
+          echo "[copilot-api] Startup failed, retrying in 15 s..."
+          sleep 15
+        done
     environment:
       GH_TOKEN: ${GH_TOKEN:?Set GH_TOKEN in .env}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4141/v1/models >/dev/null 2>&1 || exit 1"]
+      # Check the root path – the server always returns "Server running" there,
+      # without needing a valid Copilot token.  This matches the image's own
+      # built-in health check and avoids false-negatives from /v1/models.
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:4141/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 30s
+      start_period: 60s
     networks:
       # proxy gives internet access for outbound GitHub Copilot API calls
       - proxy
