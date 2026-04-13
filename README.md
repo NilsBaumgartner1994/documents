@@ -240,6 +240,12 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 | **Custom API Key** | `ollama` | Ollama benötigt keinen echten API-Key – ein beliebiger Wert reicht. |
 | **Custom Model** | `gemma4:e4b` | Lokales Modell. Alternativ: `llama3.1`, `mistral`, `gemma2`. |
 
+> **Hinweis:** Beim ersten Start muss das Ollama-Modell zunächst
+> heruntergeladen werden (Container `ollama-pull`). Paperless-AI startet
+> parallel und kann erst AI-Anfragen verarbeiten, wenn der Download
+> abgeschlossen ist. Fortschritt prüfen:
+> `docker compose logs -f ollama-pull`
+
 **Bei Copilot-Backend:**
 
 | Feld | Was eingeben | Erklärung |
