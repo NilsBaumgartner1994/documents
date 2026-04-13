@@ -45,7 +45,8 @@ GEMINI_API_KEY=<your Google Gemini API key>
 
 > **Hinweis:** Der Paperless-ngx **API-Token** (`PAPERLESS_AI_TOKEN`) wird
 > **nicht** in `.env` gesetzt. Er wird im Paperless-AI Setup-Wizard
-> eingegeben (siehe Schritt 6). `GEMINI_API_KEY` erhältst du kostenlos unter
+> eingegeben (siehe Abschnitt „Set up Paperless-AI", Schritt 1 & 3).
+> `GEMINI_API_KEY` erhältst du kostenlos unter
 > [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 The defaults are set for **local use** (`localhost`).
