@@ -164,7 +164,7 @@ services:
       AI_PROVIDER: custom
       CUSTOM_BASE_URL: http://copilot-api:4141/v1/
       CUSTOM_API_KEY: copilot
-      CUSTOM_MODEL: ${COPILOT_MODEL:-gpt-4o}
+      CUSTOM_MODEL: ${COPILOT_MODEL:-claude-3.5-sonnet}
       # ── Alternative: Google Gemini ────────────────────────────────────────
       # To use Gemini instead of Copilot, comment out the three CUSTOM_* lines
       # above and uncomment the three lines below (and set GEMINI_API_KEY in .env):
