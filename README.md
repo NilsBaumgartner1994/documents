@@ -257,7 +257,35 @@ Nach dem Abschluss des Wizards startet Paperless-AI automatisch und
 
 ---
 
-## Google Drive sync details
+## Document file naming
+
+By default, Paperless-ngx stores every document under a machine-generated path that contains no readable information.  With the `PAPERLESS_FILENAME_FORMAT` variable (set in `docker-compose.yml` and `.env.example`) the stack configures a **human-readable, numbered** naming scheme instead:
+
+```
+{created_year}/{correspondent}/{document_type}/{asn:07d}_{title}
+```
+
+This produces paths like:
+
+```
+2024/ACME-Corp/Invoice/0000042_Invoice-January-2024.pdf
+```
+
+| Part | Source |
+|---|---|
+| `2024` | Year the document was created |
+| `ACME-Corp` | Correspondent assigned by **Paperless-AI** |
+| `Invoice` | Document type assigned by **Paperless-AI** |
+| `0000042` | Archive Serial Number – a unique, ever-increasing counter |
+| `Invoice-January-2024` | Title assigned by **Paperless-AI** |
+
+The sequential number (`{asn:07d}`) ensures every filename is unique even when two documents share the same title or date.  The AI-generated title makes the file immediately recognisable without having to open it.
+
+You can customise the format by changing `PAPERLESS_FILENAME_FORMAT` in your `.env` file.  Set it to an empty string to fall back to Paperless-ngx's built-in default naming.  A full list of supported placeholders is available in the [Paperless-ngx documentation](https://docs.paperless-ngx.com/configuration/#storage).
+
+> **Note:** Changing the format after documents have already been ingested renames the existing files on disk.  Make sure you have a recent backup (e.g. via `rclone-sync`) before changing this value on a running installation.
+
+---
 
 The `rclone-sync` service runs in the background and calls `rclone sync` on a
 configurable schedule (default: **every hour**).

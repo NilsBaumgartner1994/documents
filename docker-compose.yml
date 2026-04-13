@@ -99,6 +99,9 @@ services:
       PAPERLESS_TIME_ZONE: ${TZ:-Europe/Berlin}
       USERMAP_UID: ${USERMAP_UID:-1000}
       USERMAP_GID: ${USERMAP_GID:-1000}
+      # Filename format: sequential ASN + AI-generated title, grouped by year
+      # Example: 2024/Correspondent/DocType/0000042_Invoice-January-2024.pdf
+      PAPERLESS_FILENAME_FORMAT: ${PAPERLESS_FILENAME_FORMAT:-{created_year}/{correspondent}/{document_type}/{asn:07d}_{title}}
     networks:
       - paperless-internal
       - proxy
