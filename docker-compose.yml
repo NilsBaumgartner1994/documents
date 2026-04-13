@@ -115,9 +115,56 @@ services:
       # Tell Traefik to reach this container via the shared proxy network
       - "traefik.docker.network=paperless-proxy"
 
+  # ── Ollama – Local LLM inference engine ─────────────────────────────────
+  # Runs large language models locally. The default model (gemma4:e4b) is
+  # pulled automatically by the ollama-pull init container below.
+  # If a NVIDIA GPU is available, uncomment the "deploy" block for GPU
+  # acceleration.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    # Uncomment the following block to enable NVIDIA GPU acceleration:
+    #deploy:
+    #  resources:
+    #    reservations:
+    #      devices:
+    #        - driver: nvidia
+    #          count: all
+    #          capabilities: [gpu]
+    networks:
+      - paperless-internal
+      # proxy gives internet access for initial model download
+      - proxy
+
+  # ── Ollama model pull – Init container ────────────────────────────────
+  # Runs once at startup to ensure the configured model is available in
+  # the local Ollama store. Exits after the pull is complete.
+  ollama-pull:
+    image: alpine:3
+    container_name: ollama-pull
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_started
+    volumes:
+      - ./ollama/pull-model.sh:/pull-model.sh:ro
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
+      OLLAMA_BASE_URL: http://ollama:11434
+    entrypoint: /bin/sh
+    command: ["/pull-model.sh"]
+    networks:
+      - paperless-internal
+      # proxy gives internet access for model download
+      - proxy
+
   # ── Paperless-AI – Automatic AI tagging for Paperless-ngx ───────────────
   # Watches Paperless-ngx for new documents and automatically assigns titles,
-  # tags, correspondents, and document types using the Google Gemini API.
+  # tags, correspondents, and document types using a local Ollama model
+  # (gemma4:e4b by default) via the OpenAI-compatible API.
   # Web UI is available at http://<host>:3000 after first start.
   #
   # First-time setup:
@@ -131,6 +178,8 @@ services:
     depends_on:
       paperless:
         condition: service_started
+      ollama-pull:
+        condition: service_completed_successfully
     ports:
       - "3000:3000"
     volumes:
@@ -138,16 +187,14 @@ services:
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
       PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
-      # Use Google Gemini via the OpenAI-compatible endpoint
+      # Use local Ollama via the OpenAI-compatible endpoint
       AI_PROVIDER: custom
-      CUSTOM_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai/
-      CUSTOM_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
-      CUSTOM_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      CUSTOM_BASE_URL: http://ollama:11434/v1/
+      CUSTOM_API_KEY: ollama
+      CUSTOM_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
     networks:
-      # paperless-internal to reach the Paperless-ngx API
+      # paperless-internal to reach the Paperless-ngx API and Ollama
       - paperless-internal
-      # proxy gives internet access for outbound Gemini API calls
-      - proxy
 
   # ── rclone-config – Init container: generate rclone.conf from .env ──────
   # Runs once at startup, writes /config/rclone/rclone.conf into the shared
@@ -228,3 +275,5 @@ volumes:
   rclone-config:
   # Paperless-AI application data (config, RAG index, chat history)
   paperless-ai-data:
+  # Ollama model storage (persists downloaded models across restarts)
+  ollama-data:

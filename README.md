@@ -5,7 +5,8 @@ A ready-to-run Docker Compose stack that combines:
 | Component | Purpose |
 |---|---|
 | **[Paperless-ngx](https://docs.paperless-ngx.com/)** | Document management system (scan, OCR, tag, search) |
-| **[Paperless-AI](https://github.com/clusterzx/paperless-ai)** | Automatic AI tagging & classification for new documents (powered by Google Gemini) |
+| **[Paperless-AI](https://github.com/clusterzx/paperless-ai)** | Automatic AI tagging & classification for new documents (powered by local Ollama / gemma4:e4b) |
+| **[Ollama](https://ollama.com/)** | Local LLM inference engine (runs gemma4:e4b) |
 | **[PostgreSQL 16](https://www.postgresql.org/)** | Database for Paperless-ngx |
 | **[Redis 7](https://redis.io/)** | Task queue / message broker |
 | **[Gotenberg](https://gotenberg.dev/)** | Document → PDF conversion (DOCX, XLSX, …) |
@@ -18,6 +19,7 @@ A ready-to-run Docker Compose stack that combines:
 ## Prerequisites
 
 - A Linux machine (or macOS / Windows with Docker Desktop) with Docker ≥ 24 and Docker Compose v2 (`docker compose`).
+- **Recommended:** A machine with at least 16 GB RAM and a NVIDIA GPU for fast local AI inference (CPU-only works but is slower).
 - **For production:** A public domain name pointing to the server's IP, ports **80** and **443** open.
 - **Optional:** A Google account (for Google Drive sync).
 
@@ -41,12 +43,11 @@ Open `.env` and fill in **at least** the required values:
 PAPERLESS_SECRET_KEY=<random 64-char string>
 PAPERLESS_DBPASS=<strong password>
 PAPERLESS_AI_TOKEN=<Paperless-ngx API token>
-GEMINI_API_KEY=<your Google Gemini API key>
 ```
 
 > **Hinweis:** `PAPERLESS_AI_TOKEN` wird erst nach dem ersten Start benötigt
-> (siehe Schritt 6). `GEMINI_API_KEY` erhältst du kostenlos unter
-> [Google AI Studio](https://aistudio.google.com/app/apikey).
+> (siehe Schritt 6). Das Ollama-Modell (`gemma4:e4b`) wird beim ersten Start
+> automatisch heruntergeladen – eine Internetverbindung ist dafür erforderlich.
 
 The defaults are set for **local use** (`localhost`).
 For production, also update:
@@ -136,7 +137,8 @@ your browser and log in.
 ### 6 – Set up Paperless-AI
 
 Paperless-AI erkennt neue Dokumente automatisch und vergibt Titel, Tags,
-Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
+Korrespondenten und Dokumenttypen mithilfe eines **lokalen Ollama-Modells**
+(`gemma4:e4b` per Standard).
 
 > **⚠️ Wichtig: `PAPERLESS_SECRET_KEY` ≠ API Token!**
 >
@@ -162,25 +164,19 @@ Korrespondenten und Dokumenttypen mithilfe von **Google Gemini**.
    PAPERLESS_AI_TOKEN=dein-kopierter-token
    ```
 
-#### Schritt 2: Gemini API-Key erstellen
+#### Schritt 2: Container starten
 
-1. Öffne [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Klicke auf **"Create API key"**, wähle ein Projekt und kopiere den Key.
-3. Trage den Key in die `.env`-Datei ein:
-   ```dotenv
-   GEMINI_API_KEY=dein-gemini-api-key
-   ```
-
-> **Tipp:** Der kostenlose Gemini-Tarif reicht für typische Dokumentenmengen
-> im Heimgebrauch völlig aus.
-
-#### Schritt 3: Container neu starten
+Das Ollama-Modell wird beim ersten Start automatisch heruntergeladen.
+Dies kann je nach Internetgeschwindigkeit einige Minuten dauern.
 
 ```bash
 docker compose up -d
 ```
 
-#### Schritt 4: Paperless-AI Setup-Wizard durchlaufen
+> **Tipp:** Den Download-Fortschritt kannst du mit
+> `docker compose logs -f ollama-pull` verfolgen.
+
+#### Schritt 3: Paperless-AI Setup-Wizard durchlaufen
 
 Öffne die Paperless-AI Oberfläche im Browser:
 
@@ -225,10 +221,10 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 
 | Feld | Was eingeben | Erklärung |
 |---|---|---|
-| **AI Provider** | `Custom / OpenAI compatible` auswählen | Wir nutzen die Gemini-API über den OpenAI-kompatiblen Endpunkt. |
-| **Custom Base URL** | `https://generativelanguage.googleapis.com/v1beta/openai/` | OpenAI-kompatibler Endpunkt für Google Gemini. |
-| **Custom API Key** | Dein Gemini API-Key aus Schritt 2 | Der Key von Google AI Studio. |
-| **Custom Model** | `gemini-2.0-flash` | Schnelles Modell im kostenlosen Tarif. Alternativ: `gemini-1.5-flash`, `gemini-1.5-pro`. |
+| **AI Provider** | `Custom / OpenAI compatible` auswählen | Wir nutzen die lokale Ollama-Instanz über den OpenAI-kompatiblen Endpunkt. |
+| **Custom Base URL** | `http://ollama:11434/v1/` | OpenAI-kompatibler Endpunkt des lokalen Ollama-Servers. |
+| **Custom API Key** | `ollama` | Ollama benötigt keinen echten API-Key – ein beliebiger Wert reicht. |
+| **Custom Model** | `gemma4:e4b` | Lokales Modell. Alternativ: `llama3.1`, `mistral`, `gemma2`. |
 
 > **Tipp:** Falls die Felder vorausgefüllt sind (aus den Umgebungsvariablen
 > in `docker-compose.yml`), kontrolliere nur die Werte und klicke weiter.
@@ -255,6 +251,8 @@ Nach dem Abschluss des Wizards startet Paperless-AI automatisch und
 ├── docker-compose.yml          # Main stack definition
 ├── .env.example                # Template for environment variables
 ├── .gitignore
+├── ollama/
+│   └── pull-model.sh           # Init script to pull the Ollama model on startup
 └── rclone/
     ├── rclone.conf.example     # Example rclone config (copy → rclone.conf)
     └── sync.sh                 # Sync script run inside the rclone container
@@ -325,8 +323,9 @@ und vergibt automatisch:
 - **Korrespondenten**
 - **Dokumenttypen**
 
-Die AI-Analyse läuft über **Google Gemini** (Cloud-API). Es wird kein lokales
-LLM oder GPU benötigt – ein kostenloser Gemini-API-Key reicht aus.
+Die AI-Analyse läuft über **Ollama** mit dem Modell `gemma4:e4b` – komplett
+lokal, ohne Cloud-API oder API-Key. Eine GPU wird empfohlen, ist aber nicht
+zwingend erforderlich (CPU-only funktioniert, ist aber langsamer).
 
 ### Web UI aufrufen
 
@@ -352,8 +351,7 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 | Variable | Beschreibung |
 |---|---|
 | `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (**nicht** `PAPERLESS_SECRET_KEY`!) – erstellt unter `/admin/authtoken/tokenproxy/` |
-| `GEMINI_API_KEY` | Google Gemini API-Key ([hier erstellen](https://aistudio.google.com/app/apikey)) |
-| `GEMINI_MODEL` | Modell (Standard: `gemini-2.0-flash`) |
+| `OLLAMA_MODEL` | Ollama-Modell (Standard: `gemma4:e4b`) |
 
 > **⚠️ `PAPERLESS_SECRET_KEY` vs. `PAPERLESS_AI_TOKEN`:**
 >
@@ -367,6 +365,12 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 ```bash
 # Paperless-AI Logs anzeigen
 docker compose logs -f paperless-ai
+
+# Ollama Logs anzeigen (Modellanfragen)
+docker compose logs -f ollama
+
+# Ollama Model-Pull Fortschritt anzeigen
+docker compose logs -f ollama-pull
 
 # Paperless-AI neu starten (z.B. nach .env-Änderungen)
 docker compose restart paperless-ai
