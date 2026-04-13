@@ -3,3 +3,5 @@
 .env
 rclone/rclone.conf
 rclone/service-account.json
+# GitHub Copilot config contains OAuth tokens – never commit
+copilot/github-copilot/

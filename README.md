@@ -7,6 +7,7 @@ A ready-to-run Docker Compose stack that combines:
 | **[Paperless-ngx](https://docs.paperless-ngx.com/)** | Document management system (scan, OCR, tag, search) |
 | **[Paperless-AI](https://github.com/clusterzx/paperless-ai)** | Automatic AI tagging & classification for new documents (powered by local Ollama / gemma4:e4b) |
 | **[Ollama](https://ollama.com/)** | Local LLM inference engine (runs gemma4:e4b) |
+| **[copilot-openai-api](https://github.com/yuchanns/copilot-openai-api)** | GitHub Copilot → OpenAI-compatible API proxy (alternative to Ollama) |
 | **[PostgreSQL 16](https://www.postgresql.org/)** | Database for Paperless-ngx |
 | **[Redis 7](https://redis.io/)** | Task queue / message broker |
 | **[Gotenberg](https://gotenberg.dev/)** | Document → PDF conversion (DOCX, XLSX, …) |
@@ -105,9 +106,20 @@ cat ~/.config/rclone/rclone.conf   # look for the "token = …" line under [gdri
 
 ### 4 – Start the stack
 
+Choose an **AI backend** by starting with the matching Docker Compose profile:
+
 ```bash
-docker compose up -d
+# Option A: Local Ollama (runs models on CPU, default)
+docker compose --profile ollama up -d
+
+# Option B: GitHub Copilot (requires Copilot subscription, see section below)
+docker compose --profile copilot up -d
 ```
+
+> **Hinweis:** Du kannst auch beide Profile gleichzeitig starten:
+> `docker compose --profile ollama --profile copilot up -d`
+> Paperless-AI verbindet sich aber nur mit dem Backend, das in `.env`
+> konfiguriert ist (siehe `CUSTOM_BASE_URL`).
 
 Traefik routes traffic by hostname (both HTTP and HTTPS):
 
@@ -219,12 +231,23 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 
 ##### Tab 3: AI Settings
 
+**Bei Ollama-Backend:**
+
 | Feld | Was eingeben | Erklärung |
 |---|---|---|
 | **AI Provider** | `Custom / OpenAI compatible` auswählen | Wir nutzen die lokale Ollama-Instanz über den OpenAI-kompatiblen Endpunkt. |
 | **Custom Base URL** | `http://ollama:11434/v1/` | OpenAI-kompatibler Endpunkt des lokalen Ollama-Servers. |
 | **Custom API Key** | `ollama` | Ollama benötigt keinen echten API-Key – ein beliebiger Wert reicht. |
 | **Custom Model** | `gemma4:e4b` | Lokales Modell. Alternativ: `llama3.1`, `mistral`, `gemma2`. |
+
+**Bei Copilot-Backend:**
+
+| Feld | Was eingeben | Erklärung |
+|---|---|---|
+| **AI Provider** | `Custom / OpenAI compatible` auswählen | GitHub Copilot wird über den OpenAI-kompatiblen Proxy angesprochen. |
+| **Custom Base URL** | `http://copilot-openai-api:9191/v1/` | Endpunkt des copilot-openai-api Proxys. |
+| **Custom API Key** | Dein `COPILOT_TOKEN` | Der Token, den du in `.env` konfiguriert hast. |
+| **Custom Model** | `gpt-4o` | GitHub Copilot Modell. Alternativ: `gpt-4o-mini`, `gpt-4`, `o1-mini`. |
 
 > **Tipp:** Falls die Felder vorausgefüllt sind (aus den Umgebungsvariablen
 > in `docker-compose.yml`), kontrolliere nur die Werte und klicke weiter.
@@ -251,6 +274,8 @@ Nach dem Abschluss des Wizards startet Paperless-AI automatisch und
 ├── docker-compose.yml          # Main stack definition
 ├── .env.example                # Template for environment variables
 ├── .gitignore
+├── copilot/                    # GitHub Copilot config mount point
+│   └── .gitkeep
 ├── ollama/
 │   └── pull-model.sh           # Init script to pull the Ollama model on startup
 └── rclone/
@@ -291,11 +316,16 @@ docker compose logs -f rclone-sync
 ## Useful commands
 
 ```bash
-# Start all services
-docker compose up -d
+# Start all services with Ollama (local AI)
+docker compose --profile ollama up -d
+
+# Start all services with GitHub Copilot (cloud AI)
+docker compose --profile copilot up -d
 
 # Stop all services
-docker compose down
+docker compose --profile ollama down
+# or
+docker compose --profile copilot down
 
 # View logs
 docker compose logs -f
@@ -323,8 +353,12 @@ und vergibt automatisch:
 - **Korrespondenten**
 - **Dokumenttypen**
 
-Die AI-Analyse läuft über **Ollama** mit dem Modell `gemma4:e4b` – komplett
-lokal auf der CPU, ohne Cloud-API oder API-Key.
+Die AI-Analyse kann über zwei Backends laufen:
+
+| Backend | Beschreibung | Profil |
+|---|---|---|
+| **Ollama** (Standard) | Lokales Modell `gemma4:e4b` – komplett lokal auf der CPU, ohne Cloud-API | `--profile ollama` |
+| **GitHub Copilot** | Über [copilot-openai-api](https://github.com/yuchanns/copilot-openai-api) – nutzt dein GitHub-Copilot-Abo | `--profile copilot` |
 
 ### Web UI aufrufen
 
@@ -350,7 +384,11 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 | Variable | Beschreibung |
 |---|---|
 | `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (**nicht** `PAPERLESS_SECRET_KEY`!) – erstellt unter `/admin/authtoken/tokenproxy/` |
-| `OLLAMA_MODEL` | Ollama-Modell (Standard: `gemma4:e4b`) |
+| `AI_PROVIDER` | AI-Provider für Paperless-AI (Standard: `custom`) |
+| `CUSTOM_BASE_URL` | OpenAI-kompatible Basis-URL (Ollama: `http://ollama:11434/v1/`, Copilot: `http://copilot-openai-api:9191/v1/`) |
+| `CUSTOM_API_KEY` | API-Key für das Backend (Ollama: `ollama`, Copilot: dein `COPILOT_TOKEN`) |
+| `CUSTOM_MODEL` | Modell-Name (Ollama: `gemma4:e4b`, Copilot: z.B. `gpt-4o`) |
+| `OLLAMA_MODEL` | Ollama-Modell (Standard: `gemma4:e4b`) – nur relevant bei Ollama-Backend |
 
 > **⚠️ `PAPERLESS_SECRET_KEY` vs. `PAPERLESS_AI_TOKEN`:**
 >
@@ -373,6 +411,110 @@ docker compose logs -f ollama-pull
 
 # Paperless-AI neu starten (z.B. nach .env-Änderungen)
 docker compose restart paperless-ai
+```
+
+---
+
+## GitHub Copilot als AI-Backend (Alternative zu Ollama)
+
+Anstatt ein lokales LLM über Ollama zu hosten, kannst du **GitHub Copilot**
+als AI-Backend nutzen. Der
+[copilot-openai-api](https://github.com/yuchanns/copilot-openai-api)-Proxy
+macht die GitHub Copilot API OpenAI-kompatibel – dadurch funktioniert er
+nahtlos mit Paperless-AI.
+
+### Voraussetzungen
+
+- Ein **GitHub-Konto mit aktivem Copilot-Abo** (Individual, Business oder
+  Enterprise).
+- Ein IDE-Plugin (VS Code, IntelliJ, Vim, …) muss **einmalig** installiert
+  und mit deinem GitHub-Konto angemeldet werden, damit die nötigen
+  Konfigurationsdateien erstellt werden.
+
+### Schritt 1: GitHub Copilot Konfiguration vorbereiten
+
+Nach dem Anmelden in einem unterstützten IDE-Plugin werden die
+Konfigurationsdateien automatisch erstellt:
+
+| Betriebssystem | Pfad |
+|---|---|
+| **Linux / macOS** | `~/.config/github-copilot/` |
+| **Windows** | `%LOCALAPPDATA%/github-copilot/` |
+
+Der Ordner enthält `apps.json` oder `hosts.json` (mit dem GitHub OAuth Token).
+
+### Schritt 2: `.env` konfigurieren
+
+Kommentiere die **Ollama-Variablen** aus und aktiviere die
+**Copilot-Variablen**:
+
+```dotenv
+# ── Option B: GitHub Copilot ──────────────────────────────────────────
+AI_PROVIDER=custom
+CUSTOM_BASE_URL=http://copilot-openai-api:9191/v1/
+CUSTOM_API_KEY=mein-geheimer-token
+CUSTOM_MODEL=gpt-4o
+
+# Bearer-Token für den copilot-openai-api Proxy (muss mit CUSTOM_API_KEY
+# übereinstimmen):
+COPILOT_TOKEN=mein-geheimer-token
+
+# Pfad zur lokalen GitHub Copilot Konfiguration:
+COPILOT_CONFIG_PATH=~/.config/github-copilot
+```
+
+> **Tipp:** Generiere ein sicheres Token mit:
+> ```bash
+> python3 -c "import secrets; print(secrets.token_hex(32))"
+> ```
+
+### Schritt 3: Mit Copilot-Profil starten
+
+```bash
+docker compose --profile copilot up -d
+```
+
+### Schritt 4: Paperless-AI Setup-Wizard
+
+Öffne `http://localhost:3000` und durchlaufe den Wizard. Im Tab
+**AI Settings**:
+
+| Feld | Wert |
+|---|---|
+| **AI Provider** | `Custom / OpenAI compatible` |
+| **Custom Base URL** | `http://copilot-openai-api:9191/v1/` |
+| **Custom API Key** | Dein `COPILOT_TOKEN` |
+| **Custom Model** | `gpt-4o` (oder ein anderes von Copilot unterstütztes Modell) |
+
+### Verfügbare Copilot-Modelle
+
+Eine Liste der verfügbaren Modelle erhältst du über:
+
+```bash
+curl http://localhost:9191/v1/models \
+  -H "Authorization: Bearer dein-copilot-token"
+```
+
+Gängige Modelle: `gpt-4o`, `gpt-4o-mini`, `gpt-4`, `claude-sonnet-4`,
+`o1-preview`, `o1-mini`.
+
+### Nützliche Befehle (Copilot)
+
+```bash
+# Copilot API Proxy Logs anzeigen
+docker compose logs -f copilot-openai-api
+
+# Copilot API testen
+curl -X POST http://localhost:9191/v1/chat/completions \
+  -H "Authorization: Bearer dein-copilot-token" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello!"}]}'
+
+# Zwischen Ollama und Copilot wechseln:
+# 1. .env anpassen (CUSTOM_BASE_URL, CUSTOM_API_KEY, CUSTOM_MODEL)
+# 2. Altes Profil stoppen, neues starten:
+docker compose --profile ollama down
+docker compose --profile copilot up -d
 ```
 
 ---
