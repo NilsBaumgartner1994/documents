@@ -130,6 +130,12 @@ services:
     restart: unless-stopped
     environment:
       GH_TOKEN: ${COPILOT_GH_TOKEN:?Set COPILOT_GH_TOKEN in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4141/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       # proxy gives outbound internet access so the container can reach GitHub
       - proxy
@@ -152,7 +158,7 @@ services:
       paperless:
         condition: service_started
       copilot-api:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "3000:3000"
     volumes:
