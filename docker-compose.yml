@@ -115,47 +115,26 @@ services:
       # Tell Traefik to reach this container via the shared proxy network
       - "traefik.docker.network=paperless-proxy"
 
-  # ── Ollama – Local LLM inference engine ─────────────────────────────────
-  # Runs large language models locally on the CPU. The default model
-  # (gemma4:e4b) is pulled automatically by the ollama-pull init container
-  # below.
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
+  # ── Copilot API – OpenAI-compatible wrapper for GitHub Copilot ────────────
+  # Exposes GitHub Copilot as an OpenAI-compatible API so other services
+  # (e.g. Paperless-AI) can use it for chat completions.
+  # Requires a valid GitHub token with Copilot access (GH_TOKEN in .env).
+  # Authenticate first on your local machine:  npx copilot-api@latest auth
+  copilot-api:
+    image: nghyane/copilot-api:latest
+    container_name: copilot-api
     restart: unless-stopped
-    volumes:
-      - ollama-data:/root/.ollama
-    networks:
-      - paperless-internal
-      # proxy gives internet access for initial model download
-      - proxy
-
-  # ── Ollama model pull – Init container ────────────────────────────────
-  # Runs once at startup to ensure the configured model is available in
-  # the local Ollama store. Exits after the pull is complete.
-  ollama-pull:
-    image: alpine:3
-    container_name: ollama-pull
-    restart: "no"
-    depends_on:
-      ollama:
-        condition: service_started
-    volumes:
-      - ./ollama/pull-model.sh:/pull-model.sh:ro
     environment:
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
-      OLLAMA_BASE_URL: http://ollama:11434
-    entrypoint: /bin/sh
-    command: ["/pull-model.sh"]
+      GH_TOKEN: ${GH_TOKEN:?Set GH_TOKEN in .env}
     networks:
       - paperless-internal
-      # proxy gives internet access for model download
+      # proxy gives internet access to reach GitHub Copilot API
       - proxy
 
   # ── Paperless-AI – Automatic AI tagging for Paperless-ngx ───────────────
   # Watches Paperless-ngx for new documents and automatically assigns titles,
-  # tags, correspondents, and document types using a local Ollama model
-  # (gemma4:e4b by default) via the OpenAI-compatible API.
+  # tags, correspondents, and document types using GitHub Copilot via the
+  # OpenAI-compatible copilot-api wrapper.
   # Web UI is available at http://<host>:3000 after first start.
   #
   # First-time setup:
@@ -169,8 +148,8 @@ services:
     depends_on:
       paperless:
         condition: service_started
-      ollama-pull:
-        condition: service_completed_successfully
+      copilot-api:
+        condition: service_started
     ports:
       - "3000:3000"
     volumes:
@@ -178,13 +157,13 @@ services:
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
       PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
-      # Use local Ollama via the OpenAI-compatible endpoint
+      # Use GitHub Copilot via the OpenAI-compatible copilot-api wrapper
       AI_PROVIDER: custom
-      CUSTOM_BASE_URL: http://ollama:11434/v1/
-      CUSTOM_API_KEY: ollama
-      CUSTOM_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
+      CUSTOM_BASE_URL: http://copilot-api:4141/v1/
+      CUSTOM_API_KEY: ${GH_TOKEN:?Set GH_TOKEN in .env}
+      CUSTOM_MODEL: ${COPILOT_MODEL:-gpt-4o}
     networks:
-      # paperless-internal to reach the Paperless-ngx API and Ollama
+      # paperless-internal to reach the Paperless-ngx API and copilot-api
       - paperless-internal
 
   # ── rclone-config – Init container: generate rclone.conf from .env ──────
@@ -266,5 +245,4 @@ volumes:
   rclone-config:
   # Paperless-AI application data (config, RAG index, chat history)
   paperless-ai-data:
-  # Ollama model storage (persists downloaded models across restarts)
-  ollama-data:
+

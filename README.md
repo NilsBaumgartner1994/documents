@@ -5,8 +5,8 @@ A ready-to-run Docker Compose stack that combines:
 | Component | Purpose |
 |---|---|
 | **[Paperless-ngx](https://docs.paperless-ngx.com/)** | Document management system (scan, OCR, tag, search) |
-| **[Paperless-AI](https://github.com/clusterzx/paperless-ai)** | Automatic AI tagging & classification for new documents (powered by local Ollama / gemma4:e4b) |
-| **[Ollama](https://ollama.com/)** | Local LLM inference engine (runs gemma4:e4b) |
+| **[Paperless-AI](https://github.com/clusterzx/paperless-ai)** | Automatic AI tagging & classification for new documents (powered by GitHub Copilot via [copilot-api](https://github.com/nghyane/copilot-api)) |
+| **[copilot-api](https://github.com/nghyane/copilot-api)** | OpenAI-compatible wrapper for GitHub Copilot (uses `gpt-4o` by default) |
 | **[PostgreSQL 16](https://www.postgresql.org/)** | Database for Paperless-ngx |
 | **[Redis 7](https://redis.io/)** | Task queue / message broker |
 | **[Gotenberg](https://gotenberg.dev/)** | Document → PDF conversion (DOCX, XLSX, …) |
@@ -19,7 +19,7 @@ A ready-to-run Docker Compose stack that combines:
 ## Prerequisites
 
 - A Linux machine (or macOS / Windows with Docker Desktop) with Docker ≥ 24 and Docker Compose v2 (`docker compose`).
-- **Recommended:** A machine with at least 16 GB RAM for local AI inference (runs on CPU).
+- **Required:** A GitHub account with an active **GitHub Copilot** subscription.
 - **For production:** A public domain name pointing to the server's IP, ports **80** and **443** open.
 - **Optional:** A Google account (for Google Drive sync).
 
@@ -42,12 +42,14 @@ Open `.env` and fill in **at least** the required values:
 ```dotenv
 PAPERLESS_SECRET_KEY=<random 64-char string>
 PAPERLESS_DBPASS=<strong password>
+GH_TOKEN=<GitHub token with Copilot access>
 PAPERLESS_AI_TOKEN=<Paperless-ngx API token>
 ```
 
 > **Hinweis:** `PAPERLESS_AI_TOKEN` wird erst nach dem ersten Start benötigt
-> (siehe Schritt 6). Das Ollama-Modell (`gemma4:e4b`) wird beim ersten Start
-> automatisch heruntergeladen – eine Internetverbindung ist dafür erforderlich.
+> (siehe Schritt 6). `GH_TOKEN` wird für die GitHub Copilot API benötigt –
+> authentifiziere dich zuerst mit `npx copilot-api@latest auth` auf deinem
+> lokalen Rechner.
 
 The defaults are set for **local use** (`localhost`).
 For production, also update:
@@ -137,8 +139,9 @@ your browser and log in.
 ### 6 – Set up Paperless-AI
 
 Paperless-AI erkennt neue Dokumente automatisch und vergibt Titel, Tags,
-Korrespondenten und Dokumenttypen mithilfe eines **lokalen Ollama-Modells**
-(`gemma4:e4b` per Standard).
+Korrespondenten und Dokumenttypen mithilfe von **GitHub Copilot**
+(`gpt-4o` per Standard) über den OpenAI-kompatiblen Wrapper
+[copilot-api](https://github.com/nghyane/copilot-api).
 
 > **⚠️ Wichtig: `PAPERLESS_SECRET_KEY` ≠ API Token!**
 >
@@ -147,7 +150,19 @@ Korrespondenten und Dokumenttypen mithilfe eines **lokalen Ollama-Modells**
 > Paperless-AI wird separat in der Paperless-ngx Admin-Oberfläche erstellt
 > (siehe Schritt 1 unten).
 
-#### Schritt 1: Paperless-ngx API-Token erstellen
+#### Schritt 1: GitHub Copilot Token erstellen
+
+1. Installiere `copilot-api` lokal:
+   ```bash
+   npx copilot-api@latest auth
+   ```
+2. Folge dem Authentifizierungsprozess im Browser.
+3. Kopiere den GitHub-Token und trage ihn in die `.env`-Datei ein:
+   ```dotenv
+   GH_TOKEN=dein-github-token
+   ```
+
+#### Schritt 2: Paperless-ngx API-Token erstellen
 
 1. Öffne Paperless-ngx im Browser (`http://localhost`).
 2. Logge dich mit dem Admin-User ein (erstellt in Quick-start Schritt 5 oben).
@@ -164,19 +179,13 @@ Korrespondenten und Dokumenttypen mithilfe eines **lokalen Ollama-Modells**
    PAPERLESS_AI_TOKEN=dein-kopierter-token
    ```
 
-#### Schritt 2: Container starten
-
-Das Ollama-Modell wird beim ersten Start automatisch heruntergeladen.
-Dies kann je nach Internetgeschwindigkeit einige Minuten dauern.
+#### Schritt 3: Container starten
 
 ```bash
 docker compose up -d
 ```
 
-> **Tipp:** Den Download-Fortschritt kannst du mit
-> `docker compose logs -f ollama-pull` verfolgen.
-
-#### Schritt 3: Paperless-AI Setup-Wizard durchlaufen
+#### Schritt 4: Paperless-AI Setup-Wizard durchlaufen
 
 Öffne die Paperless-AI Oberfläche im Browser:
 
@@ -221,10 +230,10 @@ Hier wird die Verbindung zu Paperless-ngx konfiguriert.
 
 | Feld | Was eingeben | Erklärung |
 |---|---|---|
-| **AI Provider** | `Custom / OpenAI compatible` auswählen | Wir nutzen die lokale Ollama-Instanz über den OpenAI-kompatiblen Endpunkt. |
-| **Custom Base URL** | `http://ollama:11434/v1/` | OpenAI-kompatibler Endpunkt des lokalen Ollama-Servers. |
-| **Custom API Key** | `ollama` | Ollama benötigt keinen echten API-Key – ein beliebiger Wert reicht. |
-| **Custom Model** | `gemma4:e4b` | Lokales Modell. Alternativ: `llama3.1`, `mistral`, `gemma2`. |
+| **AI Provider** | `Custom / OpenAI compatible` auswählen | Wir nutzen GitHub Copilot über den OpenAI-kompatiblen copilot-api Wrapper. |
+| **Custom Base URL** | `http://copilot-api:4141/v1/` | OpenAI-kompatibler Endpunkt des copilot-api Wrappers. |
+| **Custom API Key** | Dein GitHub-Token | Der gleiche Token wie `GH_TOKEN` in der `.env`-Datei. |
+| **Custom Model** | `gpt-4o` | Standard-Modell. Alternativ: `gpt-4o-mini`, `claude-3.5-sonnet`, `o3-mini`. |
 
 > **Tipp:** Falls die Felder vorausgefüllt sind (aus den Umgebungsvariablen
 > in `docker-compose.yml`), kontrolliere nur die Werte und klicke weiter.
@@ -251,8 +260,6 @@ Nach dem Abschluss des Wizards startet Paperless-AI automatisch und
 ├── docker-compose.yml          # Main stack definition
 ├── .env.example                # Template for environment variables
 ├── .gitignore
-├── ollama/
-│   └── pull-model.sh           # Init script to pull the Ollama model on startup
 └── rclone/
     ├── rclone.conf.example     # Example rclone config (copy → rclone.conf)
     └── sync.sh                 # Sync script run inside the rclone container
@@ -323,8 +330,8 @@ und vergibt automatisch:
 - **Korrespondenten**
 - **Dokumenttypen**
 
-Die AI-Analyse läuft über **Ollama** mit dem Modell `gemma4:e4b` – komplett
-lokal auf der CPU, ohne Cloud-API oder API-Key.
+Die AI-Analyse läuft über **GitHub Copilot** mit dem Modell `gpt-4o` – über
+den OpenAI-kompatiblen Wrapper [copilot-api](https://github.com/nghyane/copilot-api).
 
 ### Web UI aufrufen
 
@@ -350,7 +357,8 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 | Variable | Beschreibung |
 |---|---|
 | `PAPERLESS_AI_TOKEN` | API-Token aus Paperless-ngx (**nicht** `PAPERLESS_SECRET_KEY`!) – erstellt unter `/admin/authtoken/tokenproxy/` |
-| `OLLAMA_MODEL` | Ollama-Modell (Standard: `gemma4:e4b`) |
+| `GH_TOKEN` | GitHub-Token mit Copilot-Zugang – authentifiziert mit `npx copilot-api@latest auth` |
+| `COPILOT_MODEL` | Copilot-Modell (Standard: `gpt-4o`) |
 
 > **⚠️ `PAPERLESS_SECRET_KEY` vs. `PAPERLESS_AI_TOKEN`:**
 >
@@ -365,11 +373,8 @@ Die Paperless-AI Web-Oberfläche ist erreichbar unter:
 # Paperless-AI Logs anzeigen
 docker compose logs -f paperless-ai
 
-# Ollama Logs anzeigen (Modellanfragen)
-docker compose logs -f ollama
-
-# Ollama Model-Pull Fortschritt anzeigen
-docker compose logs -f ollama-pull
+# Copilot API Logs anzeigen
+docker compose logs -f copilot-api
 
 # Paperless-AI neu starten (z.B. nach .env-Änderungen)
 docker compose restart paperless-ai
