@@ -276,6 +276,30 @@ Relevant `.env` options:
 | `RCLONE_REMOTE` | `gdrive` | rclone remote name in `rclone.conf` |
 | `RCLONE_DEST_PATH` | `paperless-backup` | Folder path in Google Drive |
 | `SYNC_INTERVAL_SECONDS` | `3600` | Seconds between syncs |
+| `RCLONE_SYNC_MODE` | `upload` | Sync direction: `upload` (local → Drive), `download` (Drive → local), `none` (disabled) |
+
+### Sync-Modus wechseln
+
+Du kannst die Sync-Richtung jederzeit umschalten, z.B. um **nur von Google
+Drive herunterzuladen** (consume) aber **nichts hochzuladen**:
+
+```bash
+# In .env ändern:
+RCLONE_SYNC_MODE=download
+
+# Dann den Container neu starten:
+docker compose restart rclone-sync
+```
+
+| Modus | Richtung | Beschreibung |
+|---|---|---|
+| `upload` | Lokal → Google Drive | Standard – sichert Dokumente in die Cloud |
+| `download` | Google Drive → Lokal | Nur herunterladen, nichts wird hochgeladen |
+| `none` | — | Sync komplett deaktiviert |
+
+> **Hinweis:** Im `download`-Modus wird `rclone copy` statt `rclone sync`
+> verwendet, damit lokale Dateien **nicht gelöscht** werden, falls sie auf
+> Google Drive nicht vorhanden sind.
 
 View sync logs:
 
