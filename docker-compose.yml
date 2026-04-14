@@ -175,7 +175,6 @@ services:
       - paperless-ai-data:/app/data
       - ./scripts/paperless-ai-entrypoint.sh:/app/paperless-ai-entrypoint.sh:ro
     entrypoint: ["/bin/bash", "/app/paperless-ai-entrypoint.sh"]
-    command: []
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
       # Token can be set explicitly, OR auto-fetched from Paperless using

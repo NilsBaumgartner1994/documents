@@ -31,9 +31,10 @@ fetch_token() {
 
   echo "${LOG_PREFIX} Waiting for Paperless-ngx API at ${base_url} ..."
 
-  # Wait up to ~5 minutes for Paperless to become reachable
+  # The docker-compose healthcheck ensures Paperless is healthy before this
+  # container starts.  A short retry loop handles residual race conditions.
   local attempts=0
-  local max_attempts=60
+  local max_attempts=12
   until curl -sf --max-time 5 "${base_url}/api/" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
     if [ "${attempts}" -ge "${max_attempts}" ]; then
@@ -55,7 +56,9 @@ fetch_token() {
     return 1
   }
 
-  # Extract the token value (plain grep – avoids dependency on jq)
+  # Extract the token value.  We use grep+cut instead of jq because the
+  # paperless-ai base image (node:22-slim) does not ship jq.  The Paperless-ngx
+  # /api/token/ endpoint returns a simple {"token":"<value>"} JSON object.
   local token
   token=$(echo "${response}" | grep -o '"token":"[^"]*"' | head -1 | cut -d'"' -f4)
 
