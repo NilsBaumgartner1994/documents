@@ -78,6 +78,12 @@ services:
       - broker
       - gotenberg
       - tika
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     volumes:
       - paperless-data:/usr/src/paperless/data
       - paperless-media:/usr/src/paperless/media
@@ -99,6 +105,10 @@ services:
       PAPERLESS_TIME_ZONE: ${TZ:-Europe/Berlin}
       USERMAP_UID: ${USERMAP_UID:-1000}
       USERMAP_GID: ${USERMAP_GID:-1000}
+      # Admin user – auto-created on first start (avoids manual registration)
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-admin}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:?Set PAPERLESS_ADMIN_PASSWORD in .env}
+      PAPERLESS_ADMIN_MAIL: ${PAPERLESS_ADMIN_MAIL:-admin@localhost}
     networks:
       - paperless-internal
       - proxy
@@ -156,16 +166,23 @@ services:
     restart: unless-stopped
     depends_on:
       paperless:
-        condition: service_started
+        condition: service_healthy
       copilot-api:
         condition: service_healthy
     ports:
       - "3000:3000"
     volumes:
       - paperless-ai-data:/app/data
+      - ./scripts/paperless-ai-entrypoint.sh:/app/paperless-ai-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/app/paperless-ai-entrypoint.sh"]
+    command: []
     environment:
       PAPERLESS_API_URL: http://paperless:8000/api
-      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:?Set PAPERLESS_AI_TOKEN in .env}
+      # Token can be set explicitly, OR auto-fetched from Paperless using
+      # PAPERLESS_ADMIN_USER / PAPERLESS_ADMIN_PASSWORD (see entrypoint wrapper).
+      PAPERLESS_API_TOKEN: ${PAPERLESS_AI_TOKEN:-}
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-admin}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:-}
       # Use GitHub Copilot via the local copilot-api proxy (OpenAI-compatible)
       AI_PROVIDER: custom
       CUSTOM_BASE_URL: http://copilot-api:4141/v1/
